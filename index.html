@@ -84,6 +84,9 @@ button {
 <button onclick="stop()">Stop</button>
 
 <script>
+// ---------------------
+// PROGRAM DATA
+// ---------------------
 let programs = JSON.parse(localStorage.getItem("hiitPrograms")) || {};
 let currentProgram = null;
 let timers = [];
@@ -91,6 +94,41 @@ let currentIndex = 0;
 let remaining = 0;
 let interval = null;
 
+// ---------------------
+// AUDIO SETUP
+// ---------------------
+let audioCtx;
+function initAudio() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+}
+
+function shortBeep() {
+    initAudio();
+    const osc = audioCtx.createOscillator();
+    osc.frequency.value = 1000;
+    osc.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.15);
+}
+
+function longBeep() {
+    initAudio();
+    const osc = audioCtx.createOscillator();
+    osc.frequency.value = 600;
+    osc.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.8);
+}
+
+function vibrate() {
+    if (navigator.vibrate) navigator.vibrate([200,100,200]);
+}
+
+// ---------------------
+// UI / PROGRAM FUNCTIONS
+// ---------------------
 function refreshProgramDropdown() {
     const select = document.getElementById("programSelect");
     select.innerHTML = "";
@@ -153,6 +191,9 @@ function saveProgram() {
     alert("Saved!");
 }
 
+// ---------------------
+// TIMER LOGIC
+// ---------------------
 function start() {
     if (!timers.length) return;
     currentIndex = 0;
@@ -161,11 +202,10 @@ function start() {
 
 function runTimer() {
     remaining = timers[currentIndex].seconds;
-
-    const label = timers[currentIndex].label.toLowerCase();
     const labelDiv = document.getElementById("segmentLabel");
     labelDiv.textContent = timers[currentIndex].label || "";
 
+    const label = timers[currentIndex].label.toLowerCase();
     if (label.includes("run")) labelDiv.style.color = "red";
     else if (label.includes("walk")) labelDiv.style.color = "lime";
     else labelDiv.style.color = "white";
@@ -176,8 +216,10 @@ function runTimer() {
         remaining--;
         updateDisplay();
 
+        // Countdown beeps 3 → 2 → 1
         if (remaining <= 3 && remaining > 0) shortBeep();
 
+        // End of segment
         if (remaining <= 0) {
             clearInterval(interval);
             longBeep();
@@ -201,28 +243,9 @@ function updateDisplay() {
         `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
 }
 
-function shortBeep() {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    osc.frequency.value = 1000;
-    osc.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.15);
-}
-
-function longBeep() {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    osc.frequency.value = 600;
-    osc.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.8);
-}
-
-function vibrate() {
-    if (navigator.vibrate) navigator.vibrate(500);
-}
-
+// ---------------------
+// INITIAL SETUP
+// ---------------------
 refreshProgramDropdown();
 </script>
 </body>
