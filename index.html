@@ -4,11 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#000000">
-<link rel="manifest" href="manifest.json">
-
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
 <title>HIIT Pro</title>
 
 <style>
@@ -89,6 +86,14 @@ button {
 <button id="startBtn" onclick="start()">Start</button>
 <button id="pauseBtn" onclick="pause()">Pause</button>
 
+<!-- Embedded audio for iPhone -->
+<audio id="shortBeepAudio" preload="auto">
+  <source src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YYAAAAAA" type="audio/wav">
+</audio>
+<audio id="longBeepAudio" preload="auto">
+  <source src="data:audio/wav;base64,UklGRhAAAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YYAAAAAA" type="audio/wav">
+</audio>
+
 <script>
 // ---------------------
 // PROGRAM DATA
@@ -102,37 +107,14 @@ let interval = null;
 let paused = false;
 
 // ---------------------
-// AUDIO SETUP
+// AUDIO FUNCTIONS
 // ---------------------
-let audioCtx;
-function initAudio() {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-}
-
-function shortBeep() {
-    initAudio();
-    const osc = audioCtx.createOscillator();
-    osc.frequency.value = 1000;
-    osc.connect(audioCtx.destination);
-    osc.start();
-    osc.stop(audioCtx.currentTime + 0.15);
-}
-
-function longBeep() {
-    initAudio();
-    const osc = audioCtx.createOscillator();
-    osc.frequency.value = 600;
-    osc.connect(audioCtx.destination);
-    osc.start();
-    osc.stop(audioCtx.currentTime + 0.8);
-}
-
-function vibrate() {
-    if (navigator.vibrate) navigator.vibrate([200,100,200]);
-}
+function shortBeep() { document.getElementById('shortBeepAudio').play(); }
+function longBeep() { document.getElementById('longBeepAudio').play(); }
+function vibrate() { if (navigator.vibrate) navigator.vibrate([200,100,200]); }
 
 // ---------------------
-// UI / PROGRAM FUNCTIONS
+// PROGRAM UI
 // ---------------------
 function refreshProgramDropdown() {
     const select = document.getElementById("programSelect");
@@ -254,10 +236,12 @@ function updateDisplay() {
 // ---------------------
 function enableDragAndSwipe(row) {
     let startY, currentY, moving = false;
+    let startX;
 
     // Drag
     row.addEventListener('touchstart', e => {
         startY = e.touches[0].clientY;
+        startX = e.touches[0].clientX;
         row.classList.add('dragging');
     });
 
@@ -270,8 +254,21 @@ function enableDragAndSwipe(row) {
     row.addEventListener('touchend', e => {
         row.classList.remove('dragging');
         row.style.transform = '';
+
+        const endX = e.changedTouches[0].clientX;
+        if (Math.abs(endX - startX) > 100) { // swipe
+            if (confirm("Delete this segment?")) {
+                const container = document.getElementById("timerContainer");
+                const index = Array.from(container.children).indexOf(row);
+                row.remove();
+                timers.splice(index, 1);
+            }
+            return;
+        }
+
         if (!moving) return;
 
+        // Reorder
         const container = document.getElementById("timerContainer");
         const rows = Array.from(container.children);
         const index = rows.indexOf(row);
@@ -283,17 +280,12 @@ function enableDragAndSwipe(row) {
             }
         }
         container.insertBefore(row, container.children[newIndex]);
-        moving = false;
-    });
 
-    // Swipe to delete
-    let startX;
-    row.addEventListener('touchstart', e => { startX = e.touches[0].clientX; });
-    row.addEventListener('touchend', e => {
-        const endX = e.changedTouches[0].clientX;
-        if (Math.abs(endX - startX) > 100) { // swipe threshold
-            row.remove();
-        }
+        // Update timers array
+        const rowData = timers.splice(index,1)[0];
+        timers.splice(newIndex,0,rowData);
+
+        moving = false;
     });
 }
 
