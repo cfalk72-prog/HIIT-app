@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.json">
+
+<!-- iOS Specific -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="HIIT Pro">
+
+<link rel="apple-touch-icon" href="icon-192.png">
+
+<title>HIIT Pro</title>
+
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+    background: black;
+    color: white;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    height: 100%;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: env(safe-area-inset-top) 20px env(safe-area-inset-bottom);
+}
+
+#segmentLabel {
+    font-size: 36px;
+    margin-top: 40px;
+}
+
+#display {
+    font-size: 110px;
+    font-weight: bold;
+    margin: 20px 0;
+}
+
+button {
+    font-size: 18px;
+    padding: 12px 24px;
+    border-radius: 14px;
+    border: none;
+    margin: 8px;
+    background: #1c1c1e;
+    color: white;
+}
+
+button:active {
+    opacity: 0.6;
+}
+</style>
+</head>
+
+<body>
+
+<div id="segmentLabel"></div>
+<div id="display">00:00</div>
+
+<button onclick="start()">Start</button>
+<button onclick="stop()">Stop</button>
+
+<script>
+
+// Wake Lock (prevent screen sleep)
+let wakeLock = null;
+async function requestWakeLock() {
+    try {
+        wakeLock = await navigator.wakeLock.request('screen');
+    } catch (err) {}
+}
+
+// Basic Example Timer
+let remaining = 0;
+let interval;
+
+function start() {
+    remaining = 30; // demo
+    requestWakeLock();
+    run();
+}
+
+function run() {
+    updateDisplay();
+    interval = setInterval(() => {
+        remaining--;
+        updateDisplay();
+
+        if (remaining <= 3 && remaining > 0) shortBeep();
+
+        if (remaining <= 0) {
+            clearInterval(interval);
+            longBeep();
+            vibrate();
+        }
+    }, 1000);
+}
+
+function stop() {
+    clearInterval(interval);
+}
+
+function updateDisplay() {
+    const mins = Math.floor(remaining / 60);
+    const secs = remaining % 60;
+    document.getElementById("display").textContent =
+        `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+}
+
+function shortBeep() {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    osc.frequency.value = 1000;
+    osc.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.15);
+}
+
+function longBeep() {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    osc.frequency.value = 600;
+    osc.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.8);
+}
+
+function vibrate() {
+    if (navigator.vibrate) navigator.vibrate(500);
+}
+
+// Register service worker
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('service-worker.js');
+}
+
+</script>
+
+</body>
+</html>
