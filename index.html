@@ -32,15 +32,15 @@ button { font-size:16px; padding:8px 16px; margin:6px; border-radius:12px; borde
 <div id="segmentLabel"></div>
 <div id="display">00:00</div>
 
-<button id="enableAudioBtn">Enable Sounds / Start Workout</button>
-<button onclick="pause()">Pause</button>
+<button id="enableBtn">Enable Sounds / Start Workout</button>
+<button onclick="pauseTimer()">Pause</button>
 
 <!-- Embedded Audio -->
-<audio id="shortBeepAudio" preload="auto" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
-<audio id="longBeepAudio" preload="auto" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"></audio>
+<audio id="shortBeep" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto"></audio>
+<audio id="longBeep" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" preload="auto"></audio>
 
 <script>
-// ---------------- PROGRAM DATA ----------------
+// ---------- PROGRAM DATA ----------
 let programs = JSON.parse(localStorage.getItem("hiitPrograms")) || {};
 let currentProgram = null;
 let timers = [];
@@ -50,21 +50,22 @@ let interval = null;
 let paused = false;
 let audioUnlocked = false;
 
-// ---------------- AUDIO ----------------
+// ---------- AUDIO ----------
 function unlockAudio() {
-    document.getElementById('shortBeepAudio').play().catch(()=>{});
-    document.getElementById('longBeepAudio').play().catch(()=>{});
-    if(navigator.vibrate) navigator.vibrate([1]);
+    // Play silently to unlock iOS audio
+    document.getElementById('shortBeep').play().catch(()=>{});
+    document.getElementById('longBeep').play().catch(()=>{});
+    if(navigator.vibrate) navigator.vibrate(1);
     audioUnlocked = true;
 }
 
-// ---------------- UI ----------------
-function refreshProgramDropdown(){
-    const select=document.getElementById("programSelect");
-    select.innerHTML="";
+// ---------- UI ----------
+function refreshProgramDropdown() {
+    const sel=document.getElementById("programSelect");
+    sel.innerHTML="";
     for(let name in programs){
-        const option=document.createElement("option");
-        option.value=name; option.textContent=name; select.appendChild(option);
+        const opt=document.createElement("option");
+        opt.value=name; opt.textContent=name; sel.appendChild(opt);
     }
 }
 
@@ -94,14 +95,14 @@ function addTimer(label="",seconds=""){
         <button onclick="deleteTimer(this)">Delete</button>
     `;
     container.appendChild(div);
-    enableDrag();
+    initSortable();
 }
 
 function renderTimers(){
     const container=document.getElementById("timerContainer");
     container.innerHTML="";
     timers.forEach(t=>addTimer(t.label,t.seconds));
-    enableDrag();
+    initSortable();
 }
 
 function saveProgram(){
@@ -121,42 +122,40 @@ function saveProgram(){
 function deleteTimer(btn){
     if(confirm("Delete this segment?")){
         const row=btn.parentElement;
-        const index=Array.from(document.getElementById("timerContainer").children).indexOf(row);
+        const idx=Array.from(document.getElementById("timerContainer").children).indexOf(row);
         row.remove();
-        timers.splice(index,1);
+        timers.splice(idx,1);
     }
 }
 
-// ---------------- TIMER LOGIC ----------------
-function start(){
-    if(!audioUnlocked){
-        unlockAudio();
-        document.getElementById("enableAudioBtn").style.display="none";
-    }
+// ---------- TIMER ----------
+function startTimer(){
+    if(!audioUnlocked){ unlockAudio(); document.getElementById("enableBtn").style.display="none"; }
     if(!timers.length) return;
     if(!paused){ currentIndex=0; remaining=timers[0].seconds; }
     paused=false;
     runTimer();
 }
 
-function pause(){ paused=true; clearInterval(interval); }
+function pauseTimer(){ paused=true; clearInterval(interval); }
 
 function runTimer(){
     if(currentIndex>=timers.length) return;
     const labelDiv=document.getElementById("segmentLabel");
-    labelDiv.textContent=timers[currentIndex].label||"";
+    const displayDiv=document.getElementById("display");
     const lbl=timers[currentIndex].label.toLowerCase();
-    labelDiv.style.color=lbl.includes("run")?"red":lbl.includes("walk")?"lime":"white";
+    labelDiv.textContent=timers[currentIndex].label||"";
+    displayDiv.style.color=lbl.includes("run")?"red":lbl.includes("walk")?"lime":"white";
     updateDisplay();
     clearInterval(interval);
     interval=setInterval(()=>{
         if(paused) return;
         remaining--;
         updateDisplay();
-        if(remaining<=3&&remaining>0) document.getElementById('shortBeepAudio').play();
+        if(remaining<=3 && remaining>0) document.getElementById('shortBeep').play();
         if(remaining<=0){
             clearInterval(interval);
-            document.getElementById('longBeepAudio').play();
+            document.getElementById('longBeep').play();
             if(navigator.vibrate) navigator.vibrate([200,100,200]);
             currentIndex++;
             if(currentIndex<timers.length){ remaining=timers[currentIndex].seconds; setTimeout(runTimer,1000); }
@@ -165,14 +164,15 @@ function runTimer(){
 }
 
 function updateDisplay(){
-    const mins=Math.floor(remaining/60), secs=remaining%60;
-    document.getElementById("display").textContent=`${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+    const m=Math.floor(remaining/60), s=remaining%60;
+    document.getElementById("display").textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
 
-// ---------------- DRAG ----------------
-function enableDrag(){
+// ---------- DRAG-AND-DROP ----------
+function initSortable(){
     const container=document.getElementById("timerContainer");
-    new Sortable(container,{
+    if(container._sortable) return; // already initialized
+    container._sortable = new Sortable(container,{
         animation:150,
         onEnd:function(evt){
             const moved=timers.splice(evt.oldIndex,1)[0];
@@ -181,9 +181,10 @@ function enableDrag(){
     });
 }
 
-// ---------------- INITIAL SETUP ----------------
+// ---------- INITIAL SETUP ----------
 refreshProgramDropdown();
-document.getElementById("enableAudioBtn").addEventListener("click", start);
+document.getElementById("enableBtn").addEventListener("click",startTimer);
 </script>
+
 </body>
 </html>
