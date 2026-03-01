@@ -2,39 +2,19 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HIIT Pro</title>
-
-<!-- SortableJS CDN -->
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-
 <style>
-body {
-    margin: 0;
-    background: black;
-    color: white;
-    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-    text-align: center;
-    padding: 20px;
-}
-
-#segmentLabel { font-size: 32px; margin-top: 20px; }
-#display { font-size: 90px; margin: 10px 0 20px 0; }
-.timer-row {
-    background: #111;
-    padding: 10px;
-    margin: 6px 0;
-    border-radius: 10px;
-    display: flex;
-    gap: 6px;
-    align-items: center;
-}
-.timer-row input { flex: 1; padding: 6px; font-size: 16px; }
-.timer-row button { padding: 4px 10px; font-size: 14px; border-radius: 8px; border: none; background: #a00; color: white; }
-button { font-size: 16px; padding: 8px 16px; margin: 6px; border-radius: 12px; border: none; background: #1c1c1e; color: white; }
+body { margin:0; background:black; color:white; font-family:-apple-system,BlinkMacSystemFont,sans-serif; text-align:center; padding:20px; }
+#segmentLabel { font-size:32px; margin-top:20px; }
+#display { font-size:90px; margin:10px 0 20px 0; }
+.timer-row { background:#111; padding:10px; margin:6px 0; border-radius:10px; display:flex; gap:6px; align-items:center; }
+.timer-row input { flex:1; padding:6px; font-size:16px; }
+.timer-row button { padding:4px 10px; font-size:14px; border-radius:8px; border:none; background:#a00; color:white; }
+button { font-size:16px; padding:8px 16px; margin:6px; border-radius:12px; border:none; background:#1c1c1e; color:white; }
 </style>
 </head>
-
 <body>
 
 <h2>HIIT Programs</h2>
@@ -51,17 +31,16 @@ button { font-size: 16px; padding: 8px 16px; margin: 6px; border-radius: 12px; b
 <hr>
 <div id="segmentLabel"></div>
 <div id="display">00:00</div>
-<button onclick="start()">Start</button>
+
+<button id="enableAudioBtn">Enable Sounds / Start Workout</button>
 <button onclick="pause()">Pause</button>
 
 <!-- Embedded Audio -->
-<audio id="shortBeepAudio" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto"></audio>
-<audio id="longBeepAudio" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" preload="auto"></audio>
+<audio id="shortBeepAudio" preload="auto" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
+<audio id="longBeepAudio" preload="auto" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"></audio>
 
 <script>
-// ---------------------
-// PROGRAM DATA
-// ---------------------
+// ---------------- PROGRAM DATA ----------------
 let programs = JSON.parse(localStorage.getItem("hiitPrograms")) || {};
 let currentProgram = null;
 let timers = [];
@@ -69,155 +48,142 @@ let currentIndex = 0;
 let remaining = 0;
 let interval = null;
 let paused = false;
+let audioUnlocked = false;
 
-// ---------------------
-// AUDIO FUNCTIONS
-// ---------------------
-function shortBeep() { document.getElementById('shortBeepAudio').play(); }
-function longBeep() { document.getElementById('longBeepAudio').play(); }
-function vibrate() { if (navigator.vibrate) navigator.vibrate([200,100,200]); }
+// ---------------- AUDIO ----------------
+function unlockAudio() {
+    document.getElementById('shortBeepAudio').play().catch(()=>{});
+    document.getElementById('longBeepAudio').play().catch(()=>{});
+    if(navigator.vibrate) navigator.vibrate([1]);
+    audioUnlocked = true;
+}
 
-// ---------------------
-// PROGRAM UI
-// ---------------------
-function refreshProgramDropdown() {
-    const select = document.getElementById("programSelect");
-    select.innerHTML = "";
-    for (let name in programs) {
-        const option = document.createElement("option");
-        option.value = name;
-        option.textContent = name;
-        select.appendChild(option);
+// ---------------- UI ----------------
+function refreshProgramDropdown(){
+    const select=document.getElementById("programSelect");
+    select.innerHTML="";
+    for(let name in programs){
+        const option=document.createElement("option");
+        option.value=name; option.textContent=name; select.appendChild(option);
     }
 }
 
-function createProgram() {
-    const name = document.getElementById("programName").value.trim();
-    if (!name) return;
-    programs[name] = [];
-    localStorage.setItem("hiitPrograms", JSON.stringify(programs));
+function createProgram(){
+    const name=document.getElementById("programName").value.trim();
+    if(!name) return;
+    programs[name]=[];
+    localStorage.setItem("hiitPrograms",JSON.stringify(programs));
     refreshProgramDropdown();
 }
 
-function loadProgram() {
-    const name = document.getElementById("programSelect").value;
-    programs = JSON.parse(localStorage.getItem("hiitPrograms")) || {};
-    currentProgram = name;
-    timers = programs[name] ? [...programs[name]] : [];
+function loadProgram(){
+    const name=document.getElementById("programSelect").value;
+    programs=JSON.parse(localStorage.getItem("hiitPrograms"))||{};
+    currentProgram=name;
+    timers=programs[name]? [...programs[name]]:[];
     renderTimers();
 }
 
-function addTimer(label = "", seconds = "") {
-    const container = document.getElementById("timerContainer");
-    const div = document.createElement("div");
-    div.className = "timer-row";
-    div.innerHTML = `
+function addTimer(label="",seconds=""){
+    const container=document.getElementById("timerContainer");
+    const div=document.createElement("div");
+    div.className="timer-row";
+    div.innerHTML=`
         <input type="text" placeholder="Run / Walk / etc" value="${label}">
         <input type="number" placeholder="Seconds" value="${seconds}">
         <button onclick="deleteTimer(this)">Delete</button>
     `;
     container.appendChild(div);
-}
-
-function renderTimers() {
-    document.getElementById("timerContainer").innerHTML = "";
-    timers.forEach(t => addTimer(t.label, t.seconds));
     enableDrag();
 }
 
-function saveProgram() {
-    if (!currentProgram) return;
-    const newTimers = [];
-    document.querySelectorAll(".timer-row").forEach(row => {
-        const label = row.children[0].value.trim();
-        const seconds = parseInt(row.children[1].value);
-        if (!isNaN(seconds) && seconds > 0) newTimers.push({ label, seconds });
+function renderTimers(){
+    const container=document.getElementById("timerContainer");
+    container.innerHTML="";
+    timers.forEach(t=>addTimer(t.label,t.seconds));
+    enableDrag();
+}
+
+function saveProgram(){
+    if(!currentProgram) return;
+    const newTimers=[];
+    document.querySelectorAll(".timer-row").forEach(row=>{
+        const label=row.children[0].value.trim();
+        const seconds=parseInt(row.children[1].value);
+        if(!isNaN(seconds)&&seconds>0) newTimers.push({label,seconds});
     });
-    programs[currentProgram] = newTimers;
-    timers = [...newTimers];
-    localStorage.setItem("hiitPrograms", JSON.stringify(programs));
+    programs[currentProgram]=newTimers;
+    timers=[...newTimers];
+    localStorage.setItem("hiitPrograms",JSON.stringify(programs));
     alert("Saved!");
 }
 
-function deleteTimer(btn) {
-    if (confirm("Delete this segment?")) {
-        const row = btn.parentElement;
-        const index = Array.from(document.getElementById("timerContainer").children).indexOf(row);
+function deleteTimer(btn){
+    if(confirm("Delete this segment?")){
+        const row=btn.parentElement;
+        const index=Array.from(document.getElementById("timerContainer").children).indexOf(row);
         row.remove();
-        timers.splice(index, 1);
+        timers.splice(index,1);
     }
 }
 
-// ---------------------
-// TIMER LOGIC
-// ---------------------
-function start() {
-    if (!timers.length) return;
-    if (!paused) {
-        currentIndex = 0;
-        remaining = timers[0].seconds;
+// ---------------- TIMER LOGIC ----------------
+function start(){
+    if(!audioUnlocked){
+        unlockAudio();
+        document.getElementById("enableAudioBtn").style.display="none";
     }
-    paused = false;
+    if(!timers.length) return;
+    if(!paused){ currentIndex=0; remaining=timers[0].seconds; }
+    paused=false;
     runTimer();
 }
 
-function pause() {
-    paused = true;
-    clearInterval(interval);
-}
+function pause(){ paused=true; clearInterval(interval); }
 
-function runTimer() {
-    if (currentIndex >= timers.length) return;
-    const labelDiv = document.getElementById("segmentLabel");
-    labelDiv.textContent = timers[currentIndex].label || "";
-    const lbl = timers[currentIndex].label.toLowerCase();
-    labelDiv.style.color = lbl.includes("run") ? "red" : lbl.includes("walk") ? "lime" : "white";
-
+function runTimer(){
+    if(currentIndex>=timers.length) return;
+    const labelDiv=document.getElementById("segmentLabel");
+    labelDiv.textContent=timers[currentIndex].label||"";
+    const lbl=timers[currentIndex].label.toLowerCase();
+    labelDiv.style.color=lbl.includes("run")?"red":lbl.includes("walk")?"lime":"white";
     updateDisplay();
-
     clearInterval(interval);
-    interval = setInterval(() => {
-        if (paused) return;
+    interval=setInterval(()=>{
+        if(paused) return;
         remaining--;
         updateDisplay();
-        if (remaining <= 3 && remaining > 0) shortBeep();
-        if (remaining <= 0) {
+        if(remaining<=3&&remaining>0) document.getElementById('shortBeepAudio').play();
+        if(remaining<=0){
             clearInterval(interval);
-            longBeep(); vibrate();
+            document.getElementById('longBeepAudio').play();
+            if(navigator.vibrate) navigator.vibrate([200,100,200]);
             currentIndex++;
-            if (currentIndex < timers.length) {
-                remaining = timers[currentIndex].seconds;
-                setTimeout(runTimer, 1000);
-            }
+            if(currentIndex<timers.length){ remaining=timers[currentIndex].seconds; setTimeout(runTimer,1000); }
         }
-    }, 1000);
+    },1000);
 }
 
-function updateDisplay() {
-    const mins = Math.floor(remaining / 60);
-    const secs = remaining % 60;
-    document.getElementById("display").textContent =
-        `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+function updateDisplay(){
+    const mins=Math.floor(remaining/60), secs=remaining%60;
+    document.getElementById("display").textContent=`${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
 }
 
-// ---------------------
-// DRAG-AND-DROP
-// ---------------------
-function enableDrag() {
-    const container = document.getElementById("timerContainer");
-    new Sortable(container, {
-        animation: 150,
-        onEnd: function(evt) {
-            const movedItem = timers.splice(evt.oldIndex, 1)[0];
-            timers.splice(evt.newIndex, 0, movedItem);
+// ---------------- DRAG ----------------
+function enableDrag(){
+    const container=document.getElementById("timerContainer");
+    new Sortable(container,{
+        animation:150,
+        onEnd:function(evt){
+            const moved=timers.splice(evt.oldIndex,1)[0];
+            timers.splice(evt.newIndex,0,moved);
         }
     });
 }
 
-// ---------------------
-// INITIAL SETUP
-// ---------------------
+// ---------------- INITIAL SETUP ----------------
 refreshProgramDropdown();
+document.getElementById("enableAudioBtn").addEventListener("click", start);
 </script>
 </body>
 </html>
