@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#000000">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>HIIT Pro</title>
+
+<!-- SortableJS CDN -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
 <style>
 body {
@@ -18,16 +18,8 @@ body {
     padding: 20px;
 }
 
-#segmentLabel {
-    font-size: 32px;
-    margin-top: 20px;
-}
-
-#display {
-    font-size: 90px;
-    margin: 10px 0 20px 0;
-}
-
+#segmentLabel { font-size: 32px; margin-top: 20px; }
+#display { font-size: 90px; margin: 10px 0 20px 0; }
 .timer-row {
     background: #111;
     padding: 10px;
@@ -36,40 +28,18 @@ body {
     display: flex;
     gap: 6px;
     align-items: center;
-    touch-action: none;
-    user-select: none;
 }
-
-.timer-row.dragging {
-    opacity: 0.5;
-}
-
-input {
-    flex: 1;
-    padding: 6px;
-    font-size: 16px;
-}
-
-button {
-    font-size: 16px;
-    padding: 8px 16px;
-    margin: 6px;
-    border-radius: 12px;
-    border: none;
-    background: #1c1c1e;
-    color: white;
-}
+.timer-row input { flex: 1; padding: 6px; font-size: 16px; }
+.timer-row button { padding: 4px 10px; font-size: 14px; border-radius: 8px; border: none; background: #a00; color: white; }
+button { font-size: 16px; padding: 8px 16px; margin: 6px; border-radius: 12px; border: none; background: #1c1c1e; color: white; }
 </style>
 </head>
 
 <body>
 
 <h2>HIIT Programs</h2>
-
 <select id="programSelect"></select>
-<button onclick="loadProgram()">Load</button>
-<br><br>
-
+<button onclick="loadProgram()">Load</button><br><br>
 <input id="programName" placeholder="Program Name">
 <button onclick="createProgram()">New Program</button>
 
@@ -79,20 +49,14 @@ button {
 <button onclick="saveProgram()">Save Program</button>
 
 <hr>
-
 <div id="segmentLabel"></div>
 <div id="display">00:00</div>
+<button onclick="start()">Start</button>
+<button onclick="pause()">Pause</button>
 
-<button id="startBtn" onclick="start()">Start</button>
-<button id="pauseBtn" onclick="pause()">Pause</button>
-
-<!-- Embedded audio for iPhone -->
-<audio id="shortBeepAudio" preload="auto">
-  <source src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YYAAAAAA" type="audio/wav">
-</audio>
-<audio id="longBeepAudio" preload="auto">
-  <source src="data:audio/wav;base64,UklGRhAAAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YYAAAAAA" type="audio/wav">
-</audio>
+<!-- Embedded Audio -->
+<audio id="shortBeepAudio" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto"></audio>
+<audio id="longBeepAudio" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" preload="auto"></audio>
 
 <script>
 // ---------------------
@@ -150,14 +114,15 @@ function addTimer(label = "", seconds = "") {
     div.innerHTML = `
         <input type="text" placeholder="Run / Walk / etc" value="${label}">
         <input type="number" placeholder="Seconds" value="${seconds}">
+        <button onclick="deleteTimer(this)">Delete</button>
     `;
-    enableDragAndSwipe(div);
     container.appendChild(div);
 }
 
 function renderTimers() {
     document.getElementById("timerContainer").innerHTML = "";
     timers.forEach(t => addTimer(t.label, t.seconds));
+    enableDrag();
 }
 
 function saveProgram() {
@@ -172,6 +137,15 @@ function saveProgram() {
     timers = [...newTimers];
     localStorage.setItem("hiitPrograms", JSON.stringify(programs));
     alert("Saved!");
+}
+
+function deleteTimer(btn) {
+    if (confirm("Delete this segment?")) {
+        const row = btn.parentElement;
+        const index = Array.from(document.getElementById("timerContainer").children).indexOf(row);
+        row.remove();
+        timers.splice(index, 1);
+    }
 }
 
 // ---------------------
@@ -193,28 +167,23 @@ function pause() {
 }
 
 function runTimer() {
+    if (currentIndex >= timers.length) return;
     const labelDiv = document.getElementById("segmentLabel");
     labelDiv.textContent = timers[currentIndex].label || "";
-    const label = timers[currentIndex].label.toLowerCase();
-    if (label.includes("run")) labelDiv.style.color = "red";
-    else if (label.includes("walk")) labelDiv.style.color = "lime";
-    else labelDiv.style.color = "white";
+    const lbl = timers[currentIndex].label.toLowerCase();
+    labelDiv.style.color = lbl.includes("run") ? "red" : lbl.includes("walk") ? "lime" : "white";
 
     updateDisplay();
 
     clearInterval(interval);
     interval = setInterval(() => {
         if (paused) return;
-
         remaining--;
         updateDisplay();
-
         if (remaining <= 3 && remaining > 0) shortBeep();
-
         if (remaining <= 0) {
             clearInterval(interval);
-            longBeep();
-            vibrate();
+            longBeep(); vibrate();
             currentIndex++;
             if (currentIndex < timers.length) {
                 remaining = timers[currentIndex].seconds;
@@ -232,60 +201,16 @@ function updateDisplay() {
 }
 
 // ---------------------
-// DRAG & SWIPE
+// DRAG-AND-DROP
 // ---------------------
-function enableDragAndSwipe(row) {
-    let startY, currentY, moving = false;
-    let startX;
-
-    // Drag
-    row.addEventListener('touchstart', e => {
-        startY = e.touches[0].clientY;
-        startX = e.touches[0].clientX;
-        row.classList.add('dragging');
-    });
-
-    row.addEventListener('touchmove', e => {
-        currentY = e.touches[0].clientY;
-        moving = true;
-        row.style.transform = `translateY(${currentY - startY}px)`;
-    });
-
-    row.addEventListener('touchend', e => {
-        row.classList.remove('dragging');
-        row.style.transform = '';
-
-        const endX = e.changedTouches[0].clientX;
-        if (Math.abs(endX - startX) > 100) { // swipe
-            if (confirm("Delete this segment?")) {
-                const container = document.getElementById("timerContainer");
-                const index = Array.from(container.children).indexOf(row);
-                row.remove();
-                timers.splice(index, 1);
-            }
-            return;
+function enableDrag() {
+    const container = document.getElementById("timerContainer");
+    new Sortable(container, {
+        animation: 150,
+        onEnd: function(evt) {
+            const movedItem = timers.splice(evt.oldIndex, 1)[0];
+            timers.splice(evt.newIndex, 0, movedItem);
         }
-
-        if (!moving) return;
-
-        // Reorder
-        const container = document.getElementById("timerContainer");
-        const rows = Array.from(container.children);
-        const index = rows.indexOf(row);
-        let newIndex = index;
-        for (let i=0;i<rows.length;i++){
-            if (rows[i]!==row && rows[i].getBoundingClientRect().top + rows[i].offsetHeight/2 > row.getBoundingClientRect().top) {
-                newIndex = i;
-                break;
-            }
-        }
-        container.insertBefore(row, container.children[newIndex]);
-
-        // Update timers array
-        const rowData = timers.splice(index,1)[0];
-        timers.splice(newIndex,0,rowData);
-
-        moving = false;
     });
 }
 
