@@ -38,11 +38,13 @@ body {
     border-radius: 10px;
     display: flex;
     gap: 6px;
+    align-items: center;
 }
 
 input {
     flex: 1;
     padding: 6px;
+    font-size: 16px;
 }
 
 button {
@@ -82,7 +84,6 @@ button {
 <button onclick="stop()">Stop</button>
 
 <script>
-
 let programs = JSON.parse(localStorage.getItem("hiitPrograms")) || {};
 let currentProgram = null;
 let timers = [];
@@ -112,8 +113,9 @@ function createProgram() {
 
 function loadProgram() {
     const name = document.getElementById("programSelect").value;
+    programs = JSON.parse(localStorage.getItem("hiitPrograms")) || {};
     currentProgram = name;
-    timers = programs[name] || [];
+    timers = programs[name] ? [...programs[name]] : [];
     renderTimers();
 }
 
@@ -146,7 +148,7 @@ function saveProgram() {
     });
 
     programs[currentProgram] = newTimers;
-    timers = newTimers;
+    timers = [...newTimers];
     localStorage.setItem("hiitPrograms", JSON.stringify(programs));
     alert("Saved!");
 }
@@ -162,7 +164,6 @@ function runTimer() {
 
     const label = timers[currentIndex].label.toLowerCase();
     const labelDiv = document.getElementById("segmentLabel");
-
     labelDiv.textContent = timers[currentIndex].label || "";
 
     if (label.includes("run")) labelDiv.style.color = "red";
@@ -223,7 +224,6 @@ function vibrate() {
 }
 
 refreshProgramDropdown();
-
 </script>
 </body>
 </html>
