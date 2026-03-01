@@ -39,6 +39,12 @@ body {
     display: flex;
     gap: 6px;
     align-items: center;
+    touch-action: none;
+    user-select: none;
+}
+
+.timer-row.dragging {
+    opacity: 0.5;
 }
 
 input {
@@ -80,8 +86,8 @@ button {
 <div id="segmentLabel"></div>
 <div id="display">00:00</div>
 
-<button onclick="start()">Start</button>
-<button onclick="stop()">Stop</button>
+<button id="startBtn" onclick="start()">Start</button>
+<button id="pauseBtn" onclick="pause()">Pause</button>
 
 <script>
 // ---------------------
@@ -93,15 +99,14 @@ let timers = [];
 let currentIndex = 0;
 let remaining = 0;
 let interval = null;
+let paused = false;
 
 // ---------------------
 // AUDIO SETUP
 // ---------------------
 let audioCtx;
 function initAudio() {
-    if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 }
 
 function shortBeep() {
@@ -143,7 +148,6 @@ function refreshProgramDropdown() {
 function createProgram() {
     const name = document.getElementById("programName").value.trim();
     if (!name) return;
-
     programs[name] = [];
     localStorage.setItem("hiitPrograms", JSON.stringify(programs));
     refreshProgramDropdown();
@@ -165,6 +169,7 @@ function addTimer(label = "", seconds = "") {
         <input type="text" placeholder="Run / Walk / etc" value="${label}">
         <input type="number" placeholder="Seconds" value="${seconds}">
     `;
+    enableDragAndSwipe(div);
     container.appendChild(div);
 }
 
@@ -175,16 +180,12 @@ function renderTimers() {
 
 function saveProgram() {
     if (!currentProgram) return;
-
     const newTimers = [];
     document.querySelectorAll(".timer-row").forEach(row => {
         const label = row.children[0].value.trim();
         const seconds = parseInt(row.children[1].value);
-        if (!isNaN(seconds) && seconds > 0) {
-            newTimers.push({ label, seconds });
-        }
+        if (!isNaN(seconds) && seconds > 0) newTimers.push({ label, seconds });
     });
-
     programs[currentProgram] = newTimers;
     timers = [...newTimers];
     localStorage.setItem("hiitPrograms", JSON.stringify(programs));
@@ -196,15 +197,22 @@ function saveProgram() {
 // ---------------------
 function start() {
     if (!timers.length) return;
-    currentIndex = 0;
+    if (!paused) {
+        currentIndex = 0;
+        remaining = timers[0].seconds;
+    }
+    paused = false;
     runTimer();
 }
 
+function pause() {
+    paused = true;
+    clearInterval(interval);
+}
+
 function runTimer() {
-    remaining = timers[currentIndex].seconds;
     const labelDiv = document.getElementById("segmentLabel");
     labelDiv.textContent = timers[currentIndex].label || "";
-
     const label = timers[currentIndex].label.toLowerCase();
     if (label.includes("run")) labelDiv.style.color = "red";
     else if (label.includes("walk")) labelDiv.style.color = "lime";
@@ -212,28 +220,26 @@ function runTimer() {
 
     updateDisplay();
 
+    clearInterval(interval);
     interval = setInterval(() => {
+        if (paused) return;
+
         remaining--;
         updateDisplay();
 
-        // Countdown beeps 3 → 2 → 1
         if (remaining <= 3 && remaining > 0) shortBeep();
 
-        // End of segment
         if (remaining <= 0) {
             clearInterval(interval);
             longBeep();
             vibrate();
             currentIndex++;
             if (currentIndex < timers.length) {
+                remaining = timers[currentIndex].seconds;
                 setTimeout(runTimer, 1000);
             }
         }
     }, 1000);
-}
-
-function stop() {
-    clearInterval(interval);
 }
 
 function updateDisplay() {
@@ -241,6 +247,54 @@ function updateDisplay() {
     const secs = remaining % 60;
     document.getElementById("display").textContent =
         `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+}
+
+// ---------------------
+// DRAG & SWIPE
+// ---------------------
+function enableDragAndSwipe(row) {
+    let startY, currentY, moving = false;
+
+    // Drag
+    row.addEventListener('touchstart', e => {
+        startY = e.touches[0].clientY;
+        row.classList.add('dragging');
+    });
+
+    row.addEventListener('touchmove', e => {
+        currentY = e.touches[0].clientY;
+        moving = true;
+        row.style.transform = `translateY(${currentY - startY}px)`;
+    });
+
+    row.addEventListener('touchend', e => {
+        row.classList.remove('dragging');
+        row.style.transform = '';
+        if (!moving) return;
+
+        const container = document.getElementById("timerContainer");
+        const rows = Array.from(container.children);
+        const index = rows.indexOf(row);
+        let newIndex = index;
+        for (let i=0;i<rows.length;i++){
+            if (rows[i]!==row && rows[i].getBoundingClientRect().top + rows[i].offsetHeight/2 > row.getBoundingClientRect().top) {
+                newIndex = i;
+                break;
+            }
+        }
+        container.insertBefore(row, container.children[newIndex]);
+        moving = false;
+    });
+
+    // Swipe to delete
+    let startX;
+    row.addEventListener('touchstart', e => { startX = e.touches[0].clientX; });
+    row.addEventListener('touchend', e => {
+        const endX = e.changedTouches[0].clientX;
+        if (Math.abs(endX - startX) > 100) { // swipe threshold
+            row.remove();
+        }
+    });
 }
 
 // ---------------------
