@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HIIT Pro</title>
+<title>HIIT Pro iOS</title>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <style>
 body { margin:0; background:black; color:white; font-family:-apple-system,BlinkMacSystemFont,sans-serif; text-align:center; padding:20px; }
@@ -32,15 +32,11 @@ button { font-size:16px; padding:8px 16px; margin:6px; border-radius:12px; borde
 <div id="segmentLabel"></div>
 <div id="display">00:00</div>
 
-<button id="enableBtn">Enable Sounds / Start Workout</button>
+<button id="startBtn">Enable Sounds / Start Workout</button>
 <button onclick="pauseTimer()">Pause</button>
 
-<!-- Embedded Audio -->
-<audio id="shortBeep" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto"></audio>
-<audio id="longBeep" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" preload="auto"></audio>
-
 <script>
-// ---------- PROGRAM DATA ----------
+// ---------------- PROGRAM DATA ----------------
 let programs = JSON.parse(localStorage.getItem("hiitPrograms")) || {};
 let currentProgram = null;
 let timers = [];
@@ -48,18 +44,24 @@ let currentIndex = 0;
 let remaining = 0;
 let interval = null;
 let paused = false;
-let audioUnlocked = false;
+let audioCtx, shortBeepOsc, longBeepOsc;
 
-// ---------- AUDIO ----------
-function unlockAudio() {
-    // Play silently to unlock iOS audio
-    document.getElementById('shortBeep').play().catch(()=>{});
-    document.getElementById('longBeep').play().catch(()=>{});
-    if(navigator.vibrate) navigator.vibrate(1);
-    audioUnlocked = true;
+// ---------------- AUDIO SETUP ----------------
+function initAudio() {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 }
 
-// ---------- UI ----------
+function playBeep(freq, duration=200) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.frequency.value = freq;
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration/1000);
+}
+
+// ---------------- UI ----------------
 function refreshProgramDropdown() {
     const sel=document.getElementById("programSelect");
     sel.innerHTML="";
@@ -69,7 +71,7 @@ function refreshProgramDropdown() {
     }
 }
 
-function createProgram(){
+function createProgram() {
     const name=document.getElementById("programName").value.trim();
     if(!name) return;
     programs[name]=[];
@@ -77,7 +79,7 @@ function createProgram(){
     refreshProgramDropdown();
 }
 
-function loadProgram(){
+function loadProgram() {
     const name=document.getElementById("programSelect").value;
     programs=JSON.parse(localStorage.getItem("hiitPrograms"))||{};
     currentProgram=name;
@@ -85,7 +87,7 @@ function loadProgram(){
     renderTimers();
 }
 
-function addTimer(label="",seconds=""){
+function addTimer(label="",seconds="") {
     const container=document.getElementById("timerContainer");
     const div=document.createElement("div");
     div.className="timer-row";
@@ -98,14 +100,13 @@ function addTimer(label="",seconds=""){
     initSortable();
 }
 
-function renderTimers(){
+function renderTimers() {
     const container=document.getElementById("timerContainer");
     container.innerHTML="";
     timers.forEach(t=>addTimer(t.label,t.seconds));
-    initSortable();
 }
 
-function saveProgram(){
+function saveProgram() {
     if(!currentProgram) return;
     const newTimers=[];
     document.querySelectorAll(".timer-row").forEach(row=>{
@@ -128,9 +129,9 @@ function deleteTimer(btn){
     }
 }
 
-// ---------- TIMER ----------
+// ---------------- TIMER ----------------
 function startTimer(){
-    if(!audioUnlocked){ unlockAudio(); document.getElementById("enableBtn").style.display="none"; }
+    if(!audioCtx) initAudio();
     if(!timers.length) return;
     if(!paused){ currentIndex=0; remaining=timers[0].seconds; }
     paused=false;
@@ -139,7 +140,7 @@ function startTimer(){
 
 function pauseTimer(){ paused=true; clearInterval(interval); }
 
-function runTimer(){
+function runTimer() {
     if(currentIndex>=timers.length) return;
     const labelDiv=document.getElementById("segmentLabel");
     const displayDiv=document.getElementById("display");
@@ -152,10 +153,10 @@ function runTimer(){
         if(paused) return;
         remaining--;
         updateDisplay();
-        if(remaining<=3 && remaining>0) document.getElementById('shortBeep').play();
+        if(remaining<=3 && remaining>0) playBeep(1000,100); // countdown beep
         if(remaining<=0){
             clearInterval(interval);
-            document.getElementById('longBeep').play();
+            playBeep(200,400); // long beep
             if(navigator.vibrate) navigator.vibrate([200,100,200]);
             currentIndex++;
             if(currentIndex<timers.length){ remaining=timers[currentIndex].seconds; setTimeout(runTimer,1000); }
@@ -165,13 +166,16 @@ function runTimer(){
 
 function updateDisplay(){
     const m=Math.floor(remaining/60), s=remaining%60;
-    document.getElementById("display").textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    const lbl=timers[currentIndex]?.label.toLowerCase()||"";
+    const displayDiv=document.getElementById("display");
+    displayDiv.textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    displayDiv.style.color=lbl.includes("run")?"red":lbl.includes("walk")?"lime":"white";
 }
 
-// ---------- DRAG-AND-DROP ----------
+// ---------------- DRAG ----------------
 function initSortable(){
     const container=document.getElementById("timerContainer");
-    if(container._sortable) return; // already initialized
+    if(container._sortable) return;
     container._sortable = new Sortable(container,{
         animation:150,
         onEnd:function(evt){
@@ -183,8 +187,7 @@ function initSortable(){
 
 // ---------- INITIAL SETUP ----------
 refreshProgramDropdown();
-document.getElementById("enableBtn").addEventListener("click",startTimer);
+document.getElementById("startBtn").addEventListener("click",startTimer);
 </script>
-
 </body>
 </html>
