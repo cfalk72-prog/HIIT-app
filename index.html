@@ -59,8 +59,8 @@ button, select{
 }
 
 .drag-handle{
-    font-size:20px;
     cursor:grab;
+    font-size:20px;
 }
 </style>
 </head>
@@ -70,10 +70,7 @@ button, select{
 <h1>HIIT Timer</h1>
 
 <select id="programSelect"></select>
-<br>
-<button class="save" onclick="newProgram()">New Program</button>
 <button class="save" onclick="saveProgram()">Save</button>
-<button class="start" onclick="loadProgram()">Load</button>
 <button class="deleteProg" onclick="deleteProgram()">Delete</button>
 
 <div id="segmentLabel">Ready</div>
@@ -93,7 +90,6 @@ let remaining=0;
 let interval=null;
 let paused=false;
 let audioCtx=null;
-let currentProgramName="";
 
 // ---------- AUDIO ----------
 function unlockAudio(){
@@ -114,7 +110,7 @@ function beep(freq,duration){
 
     osc.frequency.value=freq;
     osc.type="sine";
-    gain.gain.value=0.8;
+    gain.gain.value=0.7;
 
     osc.connect(gain);
     gain.connect(audioCtx.destination);
@@ -125,17 +121,15 @@ function beep(freq,duration){
 
 // ---------- SEGMENTS ----------
 function addSegment(label="",seconds=30){
-
     const row=document.createElement("div");
     row.className="timer-row";
+    row.draggable=true;
 
     row.innerHTML=`
         <div class="drag-handle">☰</div>
         <input type="text" placeholder="Run or Walk" value="${label}">
         <input type="number" min="1" value="${seconds}" style="width:70px">
     `;
-
-    const container=document.getElementById("segments");
 
     // Swipe delete
     let startX=0;
@@ -152,42 +146,36 @@ function addSegment(label="",seconds=30){
         }
     });
 
-    // Touch reorder (iPhone proof)
-    const handle=row.querySelector(".drag-handle");
-    let dragging=false;
+    // Drag reorder
+    row.addEventListener("dragstart",()=>row.classList.add("dragging"));
+    row.addEventListener("dragend",()=>row.classList.remove("dragging"));
 
-    handle.addEventListener("touchstart",e=>{
-        dragging=true;
-        row.style.opacity="0.5";
-    });
+    document.getElementById("segments").appendChild(row);
+}
 
-    handle.addEventListener("touchmove",e=>{
-        if(!dragging) return;
-        e.preventDefault();
+document.getElementById("segments").addEventListener("dragover",e=>{
+    e.preventDefault();
+    const dragging=document.querySelector(".dragging");
+    const afterElement=getDragAfterElement(e.clientY);
+    const container=document.getElementById("segments");
+    if(afterElement==null){
+        container.appendChild(dragging);
+    }else{
+        container.insertBefore(dragging,afterElement);
+    }
+});
 
-        const touchY=e.touches[0].clientY;
-        const rows=[...container.children];
-
-        rows.forEach(other=>{
-            if(other===row) return;
-            const box=other.getBoundingClientRect();
-            if(touchY>box.top && touchY<box.bottom){
-                if(touchY<box.top+box.height/2){
-                    container.insertBefore(row,other);
-                }else{
-                    container.insertBefore(row,other.nextSibling);
-                }
-            }
-        });
-
-    },{passive:false});
-
-    handle.addEventListener("touchend",()=>{
-        dragging=false;
-        row.style.opacity="1";
-    });
-
-    container.appendChild(row);
+function getDragAfterElement(y){
+    const elements=[...document.querySelectorAll(".timer-row:not(.dragging)")];
+    return elements.reduce((closest,child)=>{
+        const box=child.getBoundingClientRect();
+        const offset=y-box.top-box.height/2;
+        if(offset<0 && offset>closest.offset){
+            return{offset:offset,element:child};
+        }else{
+            return closest;
+        }
+    },{offset:Number.NEGATIVE_INFINITY}).element;
 }
 
 // ---------- TIMER ----------
@@ -198,7 +186,7 @@ function startTimer(){
     document.querySelectorAll(".timer-row").forEach(row=>{
         const label=row.children[1].value.trim();
         const seconds=parseInt(row.children[2].value);
-        if(!isNaN(seconds)&&seconds>0){
+        if(!isNaN(seconds) && seconds>0){
             timers.push({label,seconds});
         }
     });
@@ -255,9 +243,7 @@ function runTimer(){
 
         if(remaining===0){
             beep(250,400);
-            if(navigator.vibrate){
-                navigator.vibrate([200,100,200]);
-            }
+            if(navigator.vibrate) navigator.vibrate([200,100,200]);
 
             clearInterval(interval);
             currentIndex++;
@@ -279,40 +265,9 @@ function updateDisplay(){
 }
 
 // ---------- PROGRAM STORAGE ----------
-function refreshProgramList(){
-    const select=document.getElementById("programSelect");
-    select.innerHTML="<option value=''>Select Program</option>";
-
-    Object.keys(localStorage).forEach(key=>{
-        if(key.startsWith("hiit_")){
-            const name=key.replace("hiit_","");
-            const option=document.createElement("option");
-            option.value=name;
-            option.textContent=name;
-            select.appendChild(option);
-        }
-    });
-}
-
-function newProgram(){
-    const name=prompt("Enter new program name:");
-    if(!name) return;
-
-    currentProgramName=name;
-    document.getElementById("segments").innerHTML="";
-}
-
 function saveProgram(){
-
-    if(!currentProgramName){
-        const selected=document.getElementById("programSelect").value;
-        if(selected){
-            currentProgramName=selected;
-        }else{
-            alert("Tap New Program first.");
-            return;
-        }
-    }
+    const name=prompt("Program name?");
+    if(!name) return;
 
     const segments=[];
     document.querySelectorAll(".timer-row").forEach(row=>{
@@ -322,22 +277,16 @@ function saveProgram(){
         });
     });
 
-    localStorage.setItem("hiit_"+currentProgramName,JSON.stringify(segments));
-    refreshProgramList();
-    alert("Program saved.");
+    localStorage.setItem("hiit_"+name,JSON.stringify(segments));
+    loadProgramList();
+    alert("Saved!");
 }
 
-function loadProgram(){
-    const select=document.getElementById("programSelect");
-    const name=select.value;
-    if(!name) return;
-
+function loadProgram(name){
     const data=localStorage.getItem("hiit_"+name);
     if(!data) return;
 
-    currentProgramName=name;
     document.getElementById("segments").innerHTML="";
-
     JSON.parse(data).forEach(seg=>{
         addSegment(seg.label,seg.seconds);
     });
@@ -350,12 +299,32 @@ function deleteProgram(){
 
     if(confirm("Delete program '"+name+"'?")){
         localStorage.removeItem("hiit_"+name);
-        currentProgramName="";
-        refreshProgramList();
+        loadProgramList();
     }
 }
 
-refreshProgramList();
+function loadProgramList(){
+    const select=document.getElementById("programSelect");
+    select.innerHTML="<option value=''>Select Program</option>";
+
+    for(let key in localStorage){
+        if(key.startsWith("hiit_")){
+            const name=key.replace("hiit_","");
+            const option=document.createElement("option");
+            option.value=name;
+            option.textContent=name;
+            select.appendChild(option);
+        }
+    }
+
+    select.onchange=()=>{
+        if(select.value){
+            loadProgram(select.value);
+        }
+    };
+}
+
+loadProgramList();
 addSegment("Run",30);
 addSegment("Walk",30);
 
