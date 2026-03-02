@@ -3,42 +3,36 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HIIT Pro iOS Fixed</title>
+<title>HIIT iPhone Stable</title>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
 <style>
-body { margin:0; background:black; color:white; font-family:-apple-system,BlinkMacSystemFont,sans-serif; text-align:center; padding:20px; }
-#segmentLabel { font-size:32px; margin-top:20px; }
+body { background:black; color:white; font-family:-apple-system; text-align:center; padding:20px; }
+#segmentLabel { font-size:30px; margin-top:20px; }
 #display { font-size:90px; margin:10px 0 20px 0; }
-.timer-row { background:#111; padding:10px; margin:6px 0; border-radius:10px; display:flex; gap:6px; align-items:center; }
+.timer-row { background:#111; padding:10px; margin:6px 0; border-radius:10px; display:flex; gap:6px; }
 .timer-row input { flex:1; padding:6px; font-size:16px; }
-.timer-row button { padding:4px 10px; font-size:14px; border-radius:8px; border:none; background:#a00; color:white; }
-button { font-size:16px; padding:8px 16px; margin:6px; border-radius:12px; border:none; background:#1c1c1e; color:white; }
+.timer-row button { background:#a00; color:white; border:none; border-radius:6px; }
+button { background:#1c1c1e; color:white; border:none; padding:8px 14px; border-radius:10px; margin:4px; }
 </style>
 </head>
 <body>
 
-<h2>HIIT Programs</h2>
-<select id="programSelect"></select>
-<button onclick="loadProgram()">Load</button><br><br>
-<input id="programName" placeholder="Program Name">
-<button onclick="createProgram()">New Program</button>
+<h2>HIIT</h2>
 
 <div id="timerContainer"></div>
-
 <button onclick="addTimer()">Add Segment</button>
-<button onclick="saveProgram()">Save Program</button>
 
 <hr>
+
 <div id="segmentLabel"></div>
 <div id="display">00:00</div>
 
-<button id="startBtn">Enable Sounds / Start Workout</button>
+<button id="startBtn">Start</button>
 <button onclick="pauseTimer()">Pause</button>
 
 <script>
-// ---------- PROGRAM DATA ----------
-let programs = JSON.parse(localStorage.getItem("hiitPrograms")) || {};
-let currentProgram = null;
+
 let timers = [];
 let currentIndex = 0;
 let remaining = 0;
@@ -46,94 +40,70 @@ let interval = null;
 let paused = false;
 let audioCtx = null;
 
-// ---------- AUDIO ----------
-function initAudio() {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+// ---------- AUDIO (iOS SAFE) ----------
+function unlockAudio() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    audioCtx.resume(); // CRITICAL for iOS
 }
 
-function playBeep(freq, duration=150) {
+function beep(freq, duration=150) {
+    if (!audioCtx) return;
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.frequency.value = freq;
+    osc.type = "sine";
     osc.connect(gain);
     gain.connect(audioCtx.destination);
     osc.start();
     osc.stop(audioCtx.currentTime + duration/1000);
 }
 
-// ---------- UI ----------
-function refreshProgramDropdown() {
-    const sel = document.getElementById("programSelect");
-    sel.innerHTML = "";
-    for(let name in programs){
-        const opt = document.createElement("option");
-        opt.value = name; opt.textContent = name; sel.appendChild(opt);
-    }
-}
-
-function createProgram() {
-    const name = document.getElementById("programName").value.trim();
-    if(!name) return;
-    programs[name] = [];
-    localStorage.setItem("hiitPrograms", JSON.stringify(programs));
-    refreshProgramDropdown();
-}
-
-function loadProgram() {
-    const name = document.getElementById("programSelect").value;
-    programs = JSON.parse(localStorage.getItem("hiitPrograms")) || {};
-    currentProgram = name;
-    timers = programs[name] ? [...programs[name]] : [];
-    renderTimers();
-}
-
-function addTimer(label="",seconds="") {
-    const container = document.getElementById("timerContainer");
+// ---------- TIMER UI ----------
+function addTimer(label="", seconds="") {
     const div = document.createElement("div");
     div.className = "timer-row";
     div.innerHTML = `
-        <input type="text" placeholder="Run / Walk / etc" value="${label}">
+        <input placeholder="Run / Walk" value="${label}">
         <input type="number" placeholder="Seconds" value="${seconds}">
         <button onclick="deleteTimer(this)">Delete</button>
     `;
-    container.appendChild(div);
-    initSortable();
-}
-
-function renderTimers() {
-    const container = document.getElementById("timerContainer");
-    container.innerHTML = "";
-    timers.forEach(t => addTimer(t.label, t.seconds));
-}
-
-function saveProgram() {
-    if(!currentProgram) return;
-    const newTimers = [];
-    document.querySelectorAll(".timer-row").forEach(row => {
-        const label = row.children[0].value.trim();
-        const seconds = parseInt(row.children[1].value);
-        if(!isNaN(seconds) && seconds>0) newTimers.push({label, seconds});
-    });
-    programs[currentProgram] = newTimers;
-    timers = [...newTimers];
-    localStorage.setItem("hiitPrograms", JSON.stringify(programs));
-    alert("Saved!");
+    document.getElementById("timerContainer").appendChild(div);
 }
 
 function deleteTimer(btn) {
-    if(confirm("Delete this segment?")) {
-        const row = btn.parentElement;
-        const idx = Array.from(document.getElementById("timerContainer").children).indexOf(row);
-        row.remove();
-        timers.splice(idx, 1);
+    if (confirm("Delete this segment?")) {
+        btn.parentElement.remove();
     }
 }
 
-// ---------- TIMER ----------
-function startTimer(){
-    if(!audioCtx) initAudio();
-    if(!timers.length) return;
-    if(!paused){ currentIndex = 0; remaining = timers[0].seconds; }
+// ---------- DRAG ----------
+new Sortable(document.getElementById("timerContainer"), {
+    animation:150
+});
+
+// ---------- TIMER LOGIC ----------
+function startTimer() {
+
+    unlockAudio(); // must happen inside tap
+
+    timers = [];
+    document.querySelectorAll(".timer-row").forEach(row=>{
+        const label = row.children[0].value.trim();
+        const seconds = parseInt(row.children[1].value);
+        if (!isNaN(seconds) && seconds > 0) {
+            timers.push({label, seconds});
+        }
+    });
+
+    if (!timers.length) return;
+
+    if (!paused) {
+        currentIndex = 0;
+        remaining = timers[0].seconds;
+    }
+
     paused = false;
     runTimer();
 }
@@ -144,63 +114,75 @@ function pauseTimer() {
 }
 
 function runTimer() {
-    if(currentIndex >= timers.length) return;
+
+    if (currentIndex >= timers.length) return;
+
+    const label = timers[currentIndex].label.toLowerCase();
     const labelDiv = document.getElementById("segmentLabel");
     const displayDiv = document.getElementById("display");
-    const lbl = timers[currentIndex].label.toLowerCase();
-    labelDiv.textContent = timers[currentIndex].label || "";
-    labelDiv.style.color = lbl.includes("run")?"red":lbl.includes("walk")?"lime":"white";
-    displayDiv.style.color = lbl.includes("run")?"red":lbl.includes("walk")?"lime":"white";
+
+    labelDiv.textContent = timers[currentIndex].label;
+
+    function applyColor() {
+        if (label.includes("run")) {
+            labelDiv.style.color = "red";
+            displayDiv.style.color = "red";
+        } else if (label.includes("walk")) {
+            labelDiv.style.color = "lime";
+            displayDiv.style.color = "lime";
+        } else {
+            labelDiv.style.color = "white";
+            displayDiv.style.color = "white";
+        }
+    }
+
+    applyColor();
     updateDisplay();
 
     clearInterval(interval);
-    interval = setInterval(()=>{
-        if(paused) return;
+
+    interval = setInterval(() => {
+
+        if (paused) return;
+
         remaining--;
         updateDisplay();
-        // Only beep at 3,2,1 seconds
-        if(remaining === 3) playBeep(1000);
-        if(remaining === 2) playBeep(1000);
-        if(remaining === 1) playBeep(1000);
-        if(remaining === 0) {
-            playBeep(200,400); // long beep
-            if(navigator.vibrate) navigator.vibrate([200,100,200]);
+
+        // ONLY 3,2,1 beeps
+        if (remaining === 3 || remaining === 2 || remaining === 1) {
+            beep(900,120);
+        }
+
+        if (remaining === 0) {
+
+            beep(200,400);
+
+            if (navigator.vibrate) {
+                navigator.vibrate([200,100,200]);
+            }
+
             clearInterval(interval);
             currentIndex++;
-            if(currentIndex < timers.length){
+
+            if (currentIndex < timers.length) {
                 remaining = timers[currentIndex].seconds;
                 setTimeout(runTimer,1000);
             }
         }
+
     },1000);
 }
 
 function updateDisplay() {
-    const m = Math.floor(remaining/60), s = remaining%60;
-    const lbl = timers[currentIndex]?.label.toLowerCase() || "";
-    const displayDiv = document.getElementById("display");
-    displayDiv.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-    displayDiv.style.color = lbl.includes("run")?"red":lbl.includes("walk")?"lime":"white";
-    const labelDiv = document.getElementById("segmentLabel");
-    labelDiv.style.color = lbl.includes("run")?"red":lbl.includes("walk")?"lime":"white";
+    const m = Math.floor(remaining/60);
+    const s = remaining%60;
+    document.getElementById("display").textContent =
+        `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
 
-// ---------- DRAG ----------
-function initSortable(){
-    const container = document.getElementById("timerContainer");
-    if(container._sortable) return;
-    container._sortable = new Sortable(container, {
-        animation:150,
-        onEnd: function(evt){
-            const moved = timers.splice(evt.oldIndex,1)[0];
-            timers.splice(evt.newIndex,0,moved);
-        }
-    });
-}
-
-// ---------- INITIAL SETUP ----------
-refreshProgramDropdown();
+// Attach start inside user gesture
 document.getElementById("startBtn").addEventListener("click", startTimer);
+
 </script>
 </body>
 </html>
