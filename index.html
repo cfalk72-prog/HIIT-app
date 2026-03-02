@@ -14,33 +14,32 @@ body{
     text-align:center;
 }
 
-h1{
-    font-size:22px;
-    margin-bottom:10px;
-}
+h1{margin-bottom:10px;}
 
 #display{
     font-size:64px;
     font-weight:bold;
-    margin:20px 0;
+    margin:15px 0;
 }
 
 #segmentLabel{
     font-size:22px;
-    margin-bottom:15px;
+    margin-bottom:10px;
 }
 
-button{
-    font-size:18px;
-    padding:12px 20px;
-    margin:6px;
+button, select{
+    font-size:16px;
+    padding:10px 14px;
+    margin:5px;
     border:none;
-    border-radius:12px;
+    border-radius:10px;
 }
 
 .start{background:#007aff;color:white;}
 .pause{background:#ff9500;color:white;}
 .add{background:#34c759;color:white;}
+.save{background:#5856d6;color:white;}
+.deleteProg{background:red;color:white;}
 
 .timer-row{
     display:flex;
@@ -50,26 +49,18 @@ button{
     padding:10px;
     border-radius:12px;
     margin:6px 0;
-    touch-action:pan-y;
 }
 
 .timer-row input{
-    font-size:16px;
+    font-size:14px;
     padding:6px;
     border-radius:8px;
     border:none;
 }
 
 .drag-handle{
-    font-size:20px;
     cursor:grab;
-}
-
-.delete{
-    background:red;
-    color:white;
-    padding:6px 10px;
-    border-radius:8px;
+    font-size:20px;
 }
 </style>
 </head>
@@ -78,14 +69,18 @@ button{
 
 <h1>HIIT Timer</h1>
 
+<select id="programSelect"></select>
+<button class="save" onclick="saveProgram()">Save</button>
+<button class="deleteProg" onclick="deleteProgram()">Delete</button>
+
 <div id="segmentLabel">Ready</div>
 <div id="display">00:00</div>
 
 <button class="start" onclick="startTimer()">Start</button>
 <button class="pause" onclick="pauseTimer()">Pause</button>
-<button class="add" onclick="addTimer()">Add Segment</button>
+<button class="add" onclick="addSegment()">Add Segment</button>
 
-<div id="timers"></div>
+<div id="segments"></div>
 
 <script>
 
@@ -96,7 +91,7 @@ let interval=null;
 let paused=false;
 let audioCtx=null;
 
-// -------- AUDIO --------
+// ---------- AUDIO ----------
 function unlockAudio(){
     if(!audioCtx){
         audioCtx=new (window.AudioContext||window.webkitAudioContext)();
@@ -106,28 +101,26 @@ function unlockAudio(){
     }
 }
 
-function beep(freq,duration=150){
-    if(!audioCtx)return;
-    if(audioCtx.state==="suspended"){
-        audioCtx.resume();
-    }
+function beep(freq,duration){
+    if(!audioCtx) return;
+    if(audioCtx.state==="suspended") audioCtx.resume();
 
     const osc=audioCtx.createOscillator();
     const gain=audioCtx.createGain();
 
     osc.frequency.value=freq;
     osc.type="sine";
-    gain.gain.value=0.6;
+    gain.gain.value=0.7;
 
     osc.connect(gain);
     gain.connect(audioCtx.destination);
 
     osc.start();
-    osc.stop(audioCtx.currentTime+duration/1000);
+    osc.stop(audioCtx.currentTime + duration/1000);
 }
 
-// -------- SEGMENTS --------
-function addTimer(label="",seconds=30){
+// ---------- SEGMENTS ----------
+function addSegment(label="",seconds=30){
     const row=document.createElement("div");
     row.className="timer-row";
     row.draggable=true;
@@ -136,10 +129,9 @@ function addTimer(label="",seconds=30){
         <div class="drag-handle">☰</div>
         <input type="text" placeholder="Run or Walk" value="${label}">
         <input type="number" min="1" value="${seconds}" style="width:70px">
-        <button class="delete">X</button>
     `;
 
-    // Swipe to delete
+    // Swipe delete
     let startX=0;
     row.addEventListener("touchstart",e=>{
         startX=e.touches[0].clientX;
@@ -154,25 +146,18 @@ function addTimer(label="",seconds=30){
         }
     });
 
-    // Delete button
-    row.querySelector(".delete").onclick=()=>{
-        if(confirm("Delete this segment?")){
-            row.remove();
-        }
-    };
-
     // Drag reorder
     row.addEventListener("dragstart",()=>row.classList.add("dragging"));
     row.addEventListener("dragend",()=>row.classList.remove("dragging"));
 
-    document.getElementById("timers").appendChild(row);
+    document.getElementById("segments").appendChild(row);
 }
 
-document.getElementById("timers").addEventListener("dragover",e=>{
+document.getElementById("segments").addEventListener("dragover",e=>{
     e.preventDefault();
     const dragging=document.querySelector(".dragging");
-    const container=document.getElementById("timers");
-    const afterElement=getDragAfterElement(container,e.clientY);
+    const afterElement=getDragAfterElement(e.clientY);
+    const container=document.getElementById("segments");
     if(afterElement==null){
         container.appendChild(dragging);
     }else{
@@ -180,12 +165,12 @@ document.getElementById("timers").addEventListener("dragover",e=>{
     }
 });
 
-function getDragAfterElement(container,y){
-    const elements=[...container.querySelectorAll(".timer-row:not(.dragging)")];
+function getDragAfterElement(y){
+    const elements=[...document.querySelectorAll(".timer-row:not(.dragging)")];
     return elements.reduce((closest,child)=>{
         const box=child.getBoundingClientRect();
         const offset=y-box.top-box.height/2;
-        if(offset<0&&offset>closest.offset){
+        if(offset<0 && offset>closest.offset){
             return{offset:offset,element:child};
         }else{
             return closest;
@@ -193,7 +178,7 @@ function getDragAfterElement(container,y){
     },{offset:Number.NEGATIVE_INFINITY}).element;
 }
 
-// -------- TIMER --------
+// ---------- TIMER ----------
 function startTimer(){
     unlockAudio();
 
@@ -201,12 +186,12 @@ function startTimer(){
     document.querySelectorAll(".timer-row").forEach(row=>{
         const label=row.children[1].value.trim();
         const seconds=parseInt(row.children[2].value);
-        if(!isNaN(seconds)&&seconds>0){
+        if(!isNaN(seconds) && seconds>0){
             timers.push({label,seconds});
         }
     });
 
-    if(!timers.length)return;
+    if(!timers.length) return;
 
     if(!paused){
         currentIndex=0;
@@ -223,35 +208,31 @@ function pauseTimer(){
 }
 
 function runTimer(){
-    if(currentIndex>=timers.length)return;
+    if(currentIndex>=timers.length) return;
 
     const labelText=timers[currentIndex].label;
-    const labelLower=labelText.toLowerCase();
+    const lower=labelText.toLowerCase();
     const labelDiv=document.getElementById("segmentLabel");
     const displayDiv=document.getElementById("display");
 
     labelDiv.textContent=labelText;
 
-    function applyColor(){
-        if(labelLower.includes("run")){
-            labelDiv.style.color="red";
-            displayDiv.style.color="red";
-        }else if(labelLower.includes("walk")){
-            labelDiv.style.color="lime";
-            displayDiv.style.color="lime";
-        }else{
-            labelDiv.style.color="white";
-            displayDiv.style.color="white";
-        }
+    if(lower.includes("run")){
+        labelDiv.style.color="red";
+        displayDiv.style.color="red";
+    }else if(lower.includes("walk")){
+        labelDiv.style.color="lime";
+        displayDiv.style.color="lime";
+    }else{
+        labelDiv.style.color="white";
+        displayDiv.style.color="white";
     }
 
-    applyColor();
     updateDisplay();
     clearInterval(interval);
 
     interval=setInterval(()=>{
-
-        if(paused)return;
+        if(paused) return;
 
         remaining--;
         updateDisplay();
@@ -261,12 +242,8 @@ function runTimer(){
         }
 
         if(remaining===0){
-
             beep(250,400);
-
-            if(navigator.vibrate){
-                navigator.vibrate([200,100,200]);
-            }
+            if(navigator.vibrate) navigator.vibrate([200,100,200]);
 
             clearInterval(interval);
             currentIndex++;
@@ -287,9 +264,69 @@ function updateDisplay(){
         `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
 
-// Add default two segments
-addTimer("Run",30);
-addTimer("Walk",30);
+// ---------- PROGRAM STORAGE ----------
+function saveProgram(){
+    const name=prompt("Program name?");
+    if(!name) return;
+
+    const segments=[];
+    document.querySelectorAll(".timer-row").forEach(row=>{
+        segments.push({
+            label:row.children[1].value,
+            seconds:parseInt(row.children[2].value)
+        });
+    });
+
+    localStorage.setItem("hiit_"+name,JSON.stringify(segments));
+    loadProgramList();
+    alert("Saved!");
+}
+
+function loadProgram(name){
+    const data=localStorage.getItem("hiit_"+name);
+    if(!data) return;
+
+    document.getElementById("segments").innerHTML="";
+    JSON.parse(data).forEach(seg=>{
+        addSegment(seg.label,seg.seconds);
+    });
+}
+
+function deleteProgram(){
+    const select=document.getElementById("programSelect");
+    const name=select.value;
+    if(!name) return;
+
+    if(confirm("Delete program '"+name+"'?")){
+        localStorage.removeItem("hiit_"+name);
+        loadProgramList();
+    }
+}
+
+function loadProgramList(){
+    const select=document.getElementById("programSelect");
+    select.innerHTML="<option value=''>Select Program</option>";
+
+    for(let key in localStorage){
+        if(key.startsWith("hiit_")){
+            const name=key.replace("hiit_","");
+            const option=document.createElement("option");
+            option.value=name;
+            option.textContent=name;
+            select.appendChild(option);
+        }
+    }
+
+    select.onchange=()=>{
+        if(select.value){
+            loadProgram(select.value);
+        }
+    };
+}
+
+loadProgramList();
+addSegment("Run",30);
+addSegment("Walk",30);
 
 </script>
 
