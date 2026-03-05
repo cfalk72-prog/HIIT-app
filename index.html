@@ -1,37 +1,32 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HIIT Timer</title>
 
 <style>
 
 body{
-font-family: Arial, sans-serif;
+font-family:Arial;
 background:#111;
 color:white;
 text-align:center;
-padding:30px;
+padding:20px;
 }
 
 h1{
-font-size:40px;
+font-size:36px;
 }
 
 .timer{
-font-size:80px;
-margin:30px 0;
-}
-
-.controls{
+font-size:70px;
 margin:20px;
 }
 
 button{
-padding:15px 25px;
+padding:12px 18px;
 margin:5px;
-font-size:18px;
+font-size:16px;
 border:none;
 border-radius:8px;
 cursor:pointer;
@@ -40,23 +35,37 @@ cursor:pointer;
 .start{background:#27ae60;color:white;}
 .pause{background:#f39c12;color:white;}
 .reset{background:#e74c3c;color:white;}
+.add{background:#3498db;color:white;}
 
 input{
-padding:10px;
-font-size:16px;
-width:80px;
+padding:8px;
 margin:5px;
-text-align:center;
+font-size:16px;
 }
 
-.phase{
-font-size:28px;
-margin-top:10px;
+.intervalRow{
+margin:8px 0;
+position:relative;
+overflow:hidden;
 }
 
-.round{
-font-size:22px;
-margin-top:10px;
+.intervalContent{
+background:#222;
+padding:14px;
+border-radius:6px;
+cursor:grab;
+transition:transform .2s;
+}
+
+.deleteBtn{
+position:absolute;
+right:0;
+top:0;
+bottom:0;
+width:80px;
+background:#e74c3c;
+color:white;
+border:none;
 }
 
 </style>
@@ -66,34 +75,41 @@ margin-top:10px;
 
 <h1>HIIT Timer</h1>
 
-<div>
-
-Work (sec)
-<input id="workTime" value="30">
-
-Rest (sec)
-<input id="restTime" value="15">
-
-Rounds
-<input id="rounds" value="8">
-
-</div>
-
 <div class="timer" id="timer">00:30</div>
+<div id="phase">Ready</div>
 
-<div class="phase" id="phase">READY</div>
+<hr>
 
-<div class="round" id="roundDisplay">Round 0 / 8</div>
+<h2>Intervals (drag to reorder)</h2>
 
-<div class="controls">
+<div id="intervalList"></div>
+
+<input id="intervalName" placeholder="Name">
+<input id="intervalTime" type="number" placeholder="Seconds">
+
+<button class="add" onclick="addInterval()">Add Interval</button>
+
+<hr>
+
+<h2>Programs</h2>
+
+<input id="programName" placeholder="Program name">
+
+<br><br>
+
+<button onclick="saveProgram()">Save</button>
+<button onclick="loadProgram()">Load</button>
+<button onclick="deleteProgram()">Delete</button>
+
+<br><br>
+
+<select id="programSelect"></select>
+
+<hr>
 
 <button class="start" onclick="startTimer()">Start</button>
-
 <button class="pause" onclick="pauseTimer()">Pause</button>
-
 <button class="reset" onclick="resetTimer()">Reset</button>
-
-</div>
 
 <audio id="beep">
 <source src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg">
@@ -101,117 +117,287 @@ Rounds
 
 <script>
 
-let timer;
-let timeLeft;
-let work;
-let rest;
-let rounds;
-let currentRound = 1;
-let isWork = true;
-let running = false;
+let intervals=[]
+let timer
+let running=false
+let currentInterval=0
+let timeLeft=0
+let dragIndex=null
+let startX=0
 
-function updateDisplay(){
-let min = Math.floor(timeLeft/60);
-let sec = timeLeft%60;
+function renderIntervals(){
 
-document.getElementById("timer").innerText =
-String(min).padStart(2,'0') + ":" +
-String(sec).padStart(2,'0');
+const list=document.getElementById("intervalList")
+list.innerHTML=""
 
-document.getElementById("roundDisplay").innerText =
-"Round " + currentRound + " / " + rounds;
+intervals.forEach((interval,index)=>{
 
-document.getElementById("phase").innerText =
-isWork ? "WORK" : "REST";
+const row=document.createElement("div")
+row.className="intervalRow"
+row.draggable=true
+row.dataset.index=index
+
+row.innerHTML=`
+<div class="intervalContent">
+${interval.name} - ${interval.time}s
+</div>
+<button class="deleteBtn" onclick="removeInterval(${index})">Delete</button>
+`
+
+row.addEventListener("dragstart",dragStart)
+row.addEventListener("dragover",dragOver)
+row.addEventListener("drop",drop)
+
+row.addEventListener("touchstart",touchStart)
+row.addEventListener("touchend",touchEnd)
+
+list.appendChild(row)
+
+})
+
+}
+
+function addInterval(){
+
+const name=document.getElementById("intervalName").value
+const time=parseInt(document.getElementById("intervalTime").value)
+
+if(!name || !time) return
+
+intervals.push({name,time})
+
+renderIntervals()
+
+}
+
+function removeInterval(i){
+
+let name=intervals[i].name
+
+if(confirm("Delete interval: "+name+" ?")){
+
+intervals.splice(i,1)
+
+renderIntervals()
+
+}
+
+}
+
+function dragStart(e){
+
+dragIndex=e.target.dataset.index
+
+}
+
+function dragOver(e){
+
+e.preventDefault()
+
+}
+
+function drop(e){
+
+const dropIndex=e.target.closest(".intervalRow").dataset.index
+
+const dragged=intervals[dragIndex]
+
+intervals.splice(dragIndex,1)
+
+intervals.splice(dropIndex,0,dragged)
+
+renderIntervals()
+
+}
+
+function touchStart(e){
+
+startX=e.touches[0].clientX
+
+}
+
+function touchEnd(e){
+
+let endX=e.changedTouches[0].clientX
+
+let diff=startX-endX
+
+if(diff>80){
+
+const content=e.currentTarget.querySelector(".intervalContent")
+
+content.style.transform="translateX(-80px)"
+
+}
+
+}
+
+function updateTimer(){
+
+let min=Math.floor(timeLeft/60)
+let sec=timeLeft%60
+
+document.getElementById("timer").innerText=
+String(min).padStart(2,'0')+":"+
+String(sec).padStart(2,'0')
+
 }
 
 function startTimer(){
 
-if(running) return;
+if(intervals.length===0) return
 
-work = parseInt(document.getElementById("workTime").value);
-rest = parseInt(document.getElementById("restTime").value);
-rounds = parseInt(document.getElementById("rounds").value);
+if(!running){
 
-if(!timeLeft){
-timeLeft = work;
-}
+running=true
 
-running = true;
+if(timeLeft===0){
 
-timer = setInterval(()=>{
-
-timeLeft--;
-
-updateDisplay();
-
-if(timeLeft <= 0){
-
-document.getElementById("beep").play();
-
-if(isWork){
-
-isWork = false;
-timeLeft = rest;
-
-}else{
-
-if(currentRound >= rounds){
-
-clearInterval(timer);
-running=false;
-document.getElementById("phase").innerText = "DONE";
-return;
+currentInterval=0
+timeLeft=intervals[0].time
 
 }
 
-currentRound++;
-isWork = true;
-timeLeft = work;
+timer=setInterval(()=>{
+
+timeLeft--
+
+updateTimer()
+
+document.getElementById("phase").innerText=
+intervals[currentInterval].name
+
+if(timeLeft<=0){
+
+document.getElementById("beep").play()
+
+currentInterval++
+
+if(currentInterval>=intervals.length){
+
+clearInterval(timer)
+
+running=false
+
+document.getElementById("phase").innerText="DONE"
+
+return
 
 }
 
+timeLeft=intervals[currentInterval].time
+
 }
 
-},1000);
+},1000)
+
+}
 
 }
 
 function pauseTimer(){
 
-clearInterval(timer);
-running=false;
+clearInterval(timer)
+
+running=false
 
 }
 
 function resetTimer(){
 
-clearInterval(timer);
+clearInterval(timer)
 
-running=false;
+running=false
 
-currentRound = 1;
-isWork = true;
+currentInterval=0
 
-work = parseInt(document.getElementById("workTime").value);
+if(intervals.length>0)
 
-timeLeft = work;
+timeLeft=intervals[0].time
 
-updateDisplay();
+else
 
-document.getElementById("phase").innerText = "READY";
+timeLeft=0
+
+updateTimer()
+
+document.getElementById("phase").innerText="Ready"
 
 }
 
-window.onload = () => {
+function saveProgram(){
 
-work = parseInt(document.getElementById("workTime").value);
+const name=document.getElementById("programName").value
 
-timeLeft = work;
+if(!name) return
 
-updateDisplay();
+localStorage.setItem("hiit_"+name,JSON.stringify(intervals))
 
-};
+loadProgramList()
+
+}
+
+function loadProgram(){
+
+const key=document.getElementById("programSelect").value
+
+const data=localStorage.getItem(key)
+
+if(!data) return
+
+intervals=JSON.parse(data)
+
+renderIntervals()
+
+resetTimer()
+
+}
+
+function deleteProgram(){
+
+const key=document.getElementById("programSelect").value
+
+if(confirm("Delete this saved program?")){
+
+localStorage.removeItem(key)
+
+loadProgramList()
+
+}
+
+}
+
+function loadProgramList(){
+
+const select=document.getElementById("programSelect")
+
+select.innerHTML=""
+
+for(let i=0;i<localStorage.length;i++){
+
+const key=localStorage.key(i)
+
+if(key.startsWith("hiit_")){
+
+const option=document.createElement("option")
+
+option.value=key
+
+option.text=key.replace("hiit_","")
+
+select.appendChild(option)
+
+}
+
+}
+
+}
+
+window.onload=()=>{
+
+loadProgramList()
+
+}
 
 </script>
 
