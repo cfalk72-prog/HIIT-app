@@ -1,194 +1,219 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HIIT iPhone Stable</title>
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-
-
-
-
-    
-
+<title>HIIT Timer</title>
 
 <style>
-body { background:black; color:white; font-family:-apple-system; text-align:center; padding:20px; }
-#segmentLabel { font-size:30px; margin-top:20px; }
-#display { font-size:90px; margin:10px 0 20px 0; }
-.timer-row { background:#111; padding:10px; margin:6px 0; border-radius:10px; display:flex; gap:6px; }
-.timer-row input { flex:1; padding:6px; font-size:16px; }
-.timer-row button { background:#a00; color:white; border:none; border-radius:6px; }
-button { background:#1c1c1e; color:white; border:none; padding:8px 14px; border-radius:10px; margin:4px; }
+
+body{
+font-family: Arial, sans-serif;
+background:#111;
+color:white;
+text-align:center;
+padding:30px;
+}
+
+h1{
+font-size:40px;
+}
+
+.timer{
+font-size:80px;
+margin:30px 0;
+}
+
+.controls{
+margin:20px;
+}
+
+button{
+padding:15px 25px;
+margin:5px;
+font-size:18px;
+border:none;
+border-radius:8px;
+cursor:pointer;
+}
+
+.start{background:#27ae60;color:white;}
+.pause{background:#f39c12;color:white;}
+.reset{background:#e74c3c;color:white;}
+
+input{
+padding:10px;
+font-size:16px;
+width:80px;
+margin:5px;
+text-align:center;
+}
+
+.phase{
+font-size:28px;
+margin-top:10px;
+}
+
+.round{
+font-size:22px;
+margin-top:10px;
+}
+
 </style>
 </head>
+
 <body>
 
-<h2>HIIT</h2>
+<h1>HIIT Timer</h1>
 
-<div id="timerContainer"></div>
-<button onclick="addTimer()">Add Segment</button>
+<div>
 
-<hr>
+Work (sec)
+<input id="workTime" value="30">
 
-<div id="segmentLabel"></div>
-<div id="display">00:00</div>
+Rest (sec)
+<input id="restTime" value="15">
 
-<button id="startBtn">Start</button>
-<button onclick="pauseTimer()">Pause</button>
+Rounds
+<input id="rounds" value="8">
+
+</div>
+
+<div class="timer" id="timer">00:30</div>
+
+<div class="phase" id="phase">READY</div>
+
+<div class="round" id="roundDisplay">Round 0 / 8</div>
+
+<div class="controls">
+
+<button class="start" onclick="startTimer()">Start</button>
+
+<button class="pause" onclick="pauseTimer()">Pause</button>
+
+<button class="reset" onclick="resetTimer()">Reset</button>
+
+</div>
+
+<audio id="beep">
+<source src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg">
+</audio>
 
 <script>
 
-let timers = [];
-let currentIndex = 0;
-let remaining = 0;
-let interval = null;
-let paused = false;
-let audioCtx = null;
+let timer;
+let timeLeft;
+let work;
+let rest;
+let rounds;
+let currentRound = 1;
+let isWork = true;
+let running = false;
 
-// ---------- AUDIO (iOS SAFE) ----------
-function unlockAudio() {
-    if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    audioCtx.resume(); // CRITICAL for iOS
+function updateDisplay(){
+let min = Math.floor(timeLeft/60);
+let sec = timeLeft%60;
+
+document.getElementById("timer").innerText =
+String(min).padStart(2,'0') + ":" +
+String(sec).padStart(2,'0');
+
+document.getElementById("roundDisplay").innerText =
+"Round " + currentRound + " / " + rounds;
+
+document.getElementById("phase").innerText =
+isWork ? "WORK" : "REST";
 }
 
-function beep(freq, duration=150) {
-    if (!audioCtx) return;
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.frequency.value = freq;
-    osc.type = "sine";
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.start();
-    osc.stop(audioCtx.currentTime + duration/1000);
+function startTimer(){
+
+if(running) return;
+
+work = parseInt(document.getElementById("workTime").value);
+rest = parseInt(document.getElementById("restTime").value);
+rounds = parseInt(document.getElementById("rounds").value);
+
+if(!timeLeft){
+timeLeft = work;
 }
 
-// ---------- TIMER UI ----------
-function addTimer(label="", seconds="") {
-    const div = document.createElement("div");
-    div.className = "timer-row";
-    div.innerHTML = `
-        <input placeholder="Run / Walk" value="${label}">
-        <input type="number" placeholder="Seconds" value="${seconds}">
-        <button onclick="deleteTimer(this)">Delete</button>
-    `;
-    document.getElementById("timerContainer").appendChild(div);
+running = true;
+
+timer = setInterval(()=>{
+
+timeLeft--;
+
+updateDisplay();
+
+if(timeLeft <= 0){
+
+document.getElementById("beep").play();
+
+if(isWork){
+
+isWork = false;
+timeLeft = rest;
+
+}else{
+
+if(currentRound >= rounds){
+
+clearInterval(timer);
+running=false;
+document.getElementById("phase").innerText = "DONE";
+return;
+
 }
 
-function deleteTimer(btn) {
-    if (confirm("Delete this segment?")) {
-        btn.parentElement.remove();
-    }
+currentRound++;
+isWork = true;
+timeLeft = work;
+
 }
 
-// ---------- DRAG ----------
-new Sortable(document.getElementById("timerContainer"), {
-    animation:150
-});
-
-// ---------- TIMER LOGIC ----------
-function startTimer() {
-
-    unlockAudio(); // must happen inside tap
-
-    timers = [];
-    document.querySelectorAll(".timer-row").forEach(row=>{
-        const label = row.children[0].value.trim();
-        const seconds = parseInt(row.children[1].value);
-        if (!isNaN(seconds) && seconds > 0) {
-            timers.push({label, seconds});
-        }
-    });
-
-    if (!timers.length) return;
-
-    if (!paused) {
-        currentIndex = 0;
-        remaining = timers[0].seconds;
-    }
-
-    paused = false;
-    runTimer();
 }
 
-function pauseTimer() {
-    paused = true;
-    clearInterval(interval);
+},1000);
+
 }
 
-function runTimer() {
+function pauseTimer(){
 
-    if (currentIndex >= timers.length) return;
+clearInterval(timer);
+running=false;
 
-    const label = timers[currentIndex].label.toLowerCase();
-    const labelDiv = document.getElementById("segmentLabel");
-    const displayDiv = document.getElementById("display");
-
-    labelDiv.textContent = timers[currentIndex].label;
-
-    function applyColor() {
-        if (label.includes("run")) {
-            labelDiv.style.color = "red";
-            displayDiv.style.color = "red";
-        } else if (label.includes("walk")) {
-            labelDiv.style.color = "lime";
-            displayDiv.style.color = "lime";
-        } else {
-            labelDiv.style.color = "white";
-            displayDiv.style.color = "white";
-        }
-    }
-
-    applyColor();
-    updateDisplay();
-
-    clearInterval(interval);
-
-    interval = setInterval(() => {
-
-        if (paused) return;
-
-        remaining--;
-        updateDisplay();
-
-        // ONLY 3,2,1 beeps
-        if (remaining === 3 || remaining === 2 || remaining === 1) {
-            beep(900,120);
-        }
-
-        if (remaining === 0) {
-
-            beep(200,400);
-
-            if (navigator.vibrate) {
-                navigator.vibrate([200,100,200]);
-            }
-
-            clearInterval(interval);
-            currentIndex++;
-
-            if (currentIndex < timers.length) {
-                remaining = timers[currentIndex].seconds;
-                setTimeout(runTimer,1000);
-            }
-        }
-
-    },1000);
 }
 
-function updateDisplay() {
-    const m = Math.floor(remaining/60);
-    const s = remaining%60;
-    document.getElementById("display").textContent =
-        `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+function resetTimer(){
+
+clearInterval(timer);
+
+running=false;
+
+currentRound = 1;
+isWork = true;
+
+work = parseInt(document.getElementById("workTime").value);
+
+timeLeft = work;
+
+updateDisplay();
+
+document.getElementById("phase").innerText = "READY";
+
 }
 
-// Attach start inside user gesture
-document.getElementById("startBtn").addEventListener("click", startTimer);
+window.onload = () => {
+
+work = parseInt(document.getElementById("workTime").value);
+
+timeLeft = work;
+
+updateDisplay();
+
+};
 
 </script>
+
 </body>
 </html>
