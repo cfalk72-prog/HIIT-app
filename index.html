@@ -53,6 +53,16 @@ cursor:grab;
 margin-right:8px;
 }
 
+#volumeControl{
+margin-top:10px;
+}
+
+select{
+font-size:18px;
+padding:6px;
+margin-top:10px;
+}
+
 </style>
 </head>
 
@@ -66,8 +76,20 @@ margin-right:8px;
 <button class="start" onclick="startTimer()">Start</button>
 <button class="stop" onclick="stopTimer()">Stop</button>
 <button class="add" onclick="addSegment()">Add Segment</button>
+
+<br>
+
+<select id="programSelect"></select>
+
+<br>
+
 <button onclick="saveProgram()">Save Program</button>
 <button onclick="loadProgram()">Load Program</button>
+
+<div id="volumeControl">
+Beep Volume<br>
+<input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="0.5">
+</div>
 
 <div id="segments"></div>
 
@@ -79,6 +101,31 @@ let timeRemaining=0
 let timerInterval=null
 
 let audioCtx=null
+let beepVolume=0.5
+
+document.getElementById("volumeSlider").addEventListener("input",e=>{
+beepVolume=parseFloat(e.target.value)
+})
+
+function refreshProgramDropdown(){
+
+let programs=JSON.parse(localStorage.getItem("hiitPrograms")||"{}")
+
+let select=document.getElementById("programSelect")
+
+select.innerHTML=""
+
+Object.keys(programs).forEach(name=>{
+
+let option=document.createElement("option")
+option.value=name
+option.textContent=name
+
+select.appendChild(option)
+
+})
+
+}
 
 function initAudio(){
 
@@ -105,7 +152,7 @@ gain.connect(audioCtx.destination)
 osc.frequency.value=freq
 osc.type="square"
 
-gain.gain.setValueAtTime(.5,audioCtx.currentTime)
+gain.gain.setValueAtTime(beepVolume,audioCtx.currentTime)
 
 osc.start()
 osc.stop(audioCtx.currentTime+duration/1000)
@@ -256,9 +303,12 @@ list.appendChild(div)
 
 function saveProgram(){
 
-let name=prompt("Program name")
+let name=document.getElementById("programSelect").value
 
+if(!name){
+name=prompt("Program name")
 if(!name)return
+}
 
 let programs=JSON.parse(localStorage.getItem("hiitPrograms")||"{}")
 
@@ -266,30 +316,27 @@ programs[name]=segments
 
 localStorage.setItem("hiitPrograms",JSON.stringify(programs))
 
+refreshProgramDropdown()
+
 alert("Program saved")
 
 }
 
 function loadProgram(){
 
+let name=document.getElementById("programSelect").value
+
+if(!name)return
+
 let programs=JSON.parse(localStorage.getItem("hiitPrograms")||"{}")
 
-let names=Object.keys(programs)
-
-if(names.length===0){
-alert("No saved programs")
-return
-}
-
-let name=prompt("Available:\n"+names.join("\n")+"\n\nType program name")
-
-if(!programs[name])return
-
-segments=programs[name]
+segments=programs[name]||[]
 
 renderSegments()
 
 }
+
+refreshProgramDropdown()
 
 </script>
 
