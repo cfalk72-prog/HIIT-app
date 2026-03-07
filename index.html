@@ -50,11 +50,6 @@ padding:10px;
 border-radius:6px;
 }
 
-.segment input{
-width:70px;
-font-size:16px;
-}
-
 .drag{
 cursor:grab;
 margin-right:10px;
@@ -90,20 +85,28 @@ let audioCtx=null
 function unlockAudio(){
 
 if(!audioCtx){
-audioCtx=new (window.AudioContext||window.webkitAudioContext)()
+audioCtx=new(window.AudioContext||window.webkitAudioContext)()
+}
+
+if(audioCtx.state==="suspended"){
+audioCtx.resume()
 }
 
 }
 
-document.body.addEventListener("touchstart",unlockAudio,{once:true})
-document.body.addEventListener("click",unlockAudio,{once:true})
+document.body.addEventListener("touchstart",unlockAudio)
+document.body.addEventListener("click",unlockAudio)
 
 function playBeep(freq=1200,duration=120){
 
 if(!audioCtx)return
 
-let osc=audioCtx.createOscillator()
-let gain=audioCtx.createGain()
+if(audioCtx.state==="suspended"){
+audioCtx.resume()
+}
+
+const osc=audioCtx.createOscillator()
+const gain=audioCtx.createGain()
 
 osc.connect(gain)
 gain.connect(audioCtx.destination)
@@ -111,11 +114,10 @@ gain.connect(audioCtx.destination)
 osc.frequency.value=freq
 osc.type="square"
 
-gain.gain.value=0.4
+gain.gain.setValueAtTime(.4,audioCtx.currentTime)
 
-osc.start()
-
-setTimeout(()=>{osc.stop()},duration)
+osc.start(audioCtx.currentTime)
+osc.stop(audioCtx.currentTime+duration/1000)
 
 }
 
@@ -128,6 +130,8 @@ setTimeout(()=>playBeep(600),300)
 }
 
 function startTimer(){
+
+unlockAudio()
 
 if(segments.length===0)return
 
@@ -262,7 +266,6 @@ list.appendChild(div)
 function saveProgram(){
 
 localStorage.setItem("hiitSegments",JSON.stringify(segments))
-
 alert("Saved")
 
 }
