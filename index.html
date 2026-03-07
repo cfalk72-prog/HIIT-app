@@ -14,9 +14,7 @@ text-align:center;
 margin:0;
 }
 
-h1{
-margin-top:10px;
-}
+h1{margin-top:10px;}
 
 #timer{
 font-size:90px;
@@ -24,8 +22,7 @@ margin:20px;
 }
 
 #segmentLabel{
-font-size:39px;
-font-weight:bold;
+font-size:26px;
 margin-bottom:10px;
 }
 
@@ -49,10 +46,6 @@ background:#222;
 margin:6px;
 padding:10px;
 border-radius:6px;
-}
-
-.segmentName{
-cursor:pointer;
 }
 
 .controls button{
@@ -122,10 +115,13 @@ let select=document.getElementById("programSelect")
 select.innerHTML=""
 
 Object.keys(programs).forEach(name=>{
+
 let option=document.createElement("option")
 option.value=name
 option.textContent=name
+
 select.appendChild(option)
+
 })
 
 }
@@ -187,24 +183,7 @@ let seg=segments[currentSegment]
 
 timeRemaining=seg.time
 
-const label=document.getElementById("segmentLabel")
-
-label.innerText=seg.name
-
-let name=seg.name.toLowerCase()
-
-label.style.fontWeight="bold"
-label.style.fontSize="39px"
-
-if(name.includes("run")){
-label.style.color="red"
-}
-else if(name.includes("walk")){
-label.style.color="limegreen"
-}
-else{
-label.style.color="white"
-}
+document.getElementById("segmentLabel").innerText=seg.name
 
 updateDisplay()
 
@@ -228,10 +207,8 @@ currentSegment++
 
 if(currentSegment<segments.length){
 setTimeout(runSegment,400)
-}
-else{
-label.innerText="Finished"
-label.style.color="white"
+}else{
+document.getElementById("segmentLabel").innerText="Finished"
 }
 
 }
@@ -262,19 +239,6 @@ if(!name)return
 let seconds=parseInt(prompt("Seconds"))
 
 segments.push({name:name,time:seconds})
-
-renderSegments()
-
-}
-
-function editSegment(i){
-
-let newName=prompt("Segment name",segments[i].name)
-if(!newName)return
-
-let newTime=parseInt(prompt("Seconds",segments[i].time))
-
-segments[i]={name:newName,time:newTime}
 
 renderSegments()
 
@@ -325,7 +289,7 @@ let div=document.createElement("div")
 div.className="segment"
 
 div.innerHTML=`
-<div class="segmentName" onclick="editSegment(${i})">
+<div>
 <b>${seg.name}</b> - ${seg.time}s
 </div>
 
