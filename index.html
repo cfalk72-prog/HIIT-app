@@ -27,9 +27,9 @@ margin-bottom:10px;
 }
 
 button{
-font-size:18px;
-padding:10px 18px;
-margin:5px;
+font-size:16px;
+padding:8px 14px;
+margin:4px;
 border:none;
 border-radius:6px;
 }
@@ -48,9 +48,9 @@ padding:10px;
 border-radius:6px;
 }
 
-.drag{
-cursor:grab;
-margin-right:8px;
+.controls button{
+font-size:14px;
+padding:6px 8px;
 }
 
 #volumeControl{
@@ -110,7 +110,6 @@ beepVolume=parseFloat(e.target.value)
 function refreshProgramDropdown(){
 
 let programs=JSON.parse(localStorage.getItem("hiitPrograms")||"{}")
-
 let select=document.getElementById("programSelect")
 
 select.innerHTML=""
@@ -219,9 +218,7 @@ document.getElementById("segmentLabel").innerText="Finished"
 }
 
 function stopTimer(){
-
 clearInterval(timerInterval)
-
 }
 
 function updateDisplay(){
@@ -257,6 +254,30 @@ renderSegments()
 
 }
 
+function moveUp(i){
+
+if(i===0)return
+
+let temp=segments[i]
+segments[i]=segments[i-1]
+segments[i-1]=temp
+
+renderSegments()
+
+}
+
+function moveDown(i){
+
+if(i===segments.length-1)return
+
+let temp=segments[i]
+segments[i]=segments[i+1]
+segments[i+1]=temp
+
+renderSegments()
+
+}
+
 function renderSegments(){
 
 let list=document.getElementById("segments")
@@ -266,34 +287,18 @@ segments.forEach((seg,i)=>{
 
 let div=document.createElement("div")
 div.className="segment"
-div.draggable=true
 
 div.innerHTML=`
-<span class="drag">☰</span>
-${seg.name} - ${seg.time}s
+<div>
+<b>${seg.name}</b> - ${seg.time}s
+</div>
+
+<div class="controls">
+<button onclick="moveUp(${i})">⬆</button>
+<button onclick="moveDown(${i})">⬇</button>
 <button onclick="deleteSegment(${i})">Delete</button>
+</div>
 `
-
-div.addEventListener("dragstart",e=>{
-e.dataTransfer.setData("index",i)
-})
-
-div.addEventListener("dragover",e=>{
-e.preventDefault()
-})
-
-div.addEventListener("drop",e=>{
-
-let from=e.dataTransfer.getData("index")
-
-let temp=segments[from]
-
-segments.splice(from,1)
-segments.splice(i,0,temp)
-
-renderSegments()
-
-})
 
 list.appendChild(div)
 
