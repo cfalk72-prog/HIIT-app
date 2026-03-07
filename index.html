@@ -3,7 +3,6 @@
 <head>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>HIIT Timer</title>
-
 <style>
 body{
 font-family:Arial;
@@ -76,168 +75,169 @@ beepVolume=parseFloat(e.target.value)
 })
 
 function refreshProgramDropdown(){
-let programs=JSON.parse(localStorage.getItem("hiitPrograms")||"{}")
-let select=document.getElementById("programSelect")
-select.innerHTML=""
-Object.keys(programs).forEach(name=>{
-let option=document.createElement("option")
-option.value=name
-option.textContent=name
-select.appendChild(option)
-})
+    let programs=JSON.parse(localStorage.getItem("hiitPrograms")||"{}")
+    let select=document.getElementById("programSelect")
+    select.innerHTML=""
+    Object.keys(programs).forEach(name=>{
+        let option=document.createElement("option")
+        option.value=name
+        option.textContent=name
+        select.appendChild(option)
+    })
 }
 
 function initAudio(){
-if(!audioCtx){audioCtx=new(window.AudioContext||window.webkitAudioContext)()}
-if(audioCtx.state==="suspended"){audioCtx.resume()}
+    if(!audioCtx){audioCtx=new(window.AudioContext||window.webkitAudioContext)()}
+    if(audioCtx.state==="suspended"){audioCtx.resume()}
 }
 
 function playBeep(freq=1400,duration=120){
-if(!audioCtx)return
-const osc=audioCtx.createOscillator()
-const gain=audioCtx.createGain()
-osc.connect(gain)
-gain.connect(audioCtx.destination)
-osc.frequency.value=freq
-osc.type="square"
-gain.gain.setValueAtTime(beepVolume,audioCtx.currentTime)
-osc.start()
-osc.stop(audioCtx.currentTime+duration/1000)
+    if(!audioCtx)return
+    const osc=audioCtx.createOscillator()
+    const gain=audioCtx.createGain()
+    osc.connect(gain)
+    gain.connect(audioCtx.destination)
+    osc.frequency.value=freq
+    osc.type="square"
+    gain.gain.setValueAtTime(beepVolume,audioCtx.currentTime)
+    osc.start()
+    osc.stop(audioCtx.currentTime+duration/1000)
 }
 
 function playTripleBeep(){
-playBeep(600)
-setTimeout(()=>playBeep(600),150)
-setTimeout(()=>playBeep(600),300)
+    playBeep(600)
+    setTimeout(()=>playBeep(600),150)
+    setTimeout(()=>playBeep(600),300)
 }
 
 function startTimer(){
-initAudio()
-if(segments.length===0)return
-currentSegment=0
-runSegment()
+    // must be called by user interaction (Start button) for iPhone audio
+    initAudio()
+    if(segments.length===0) return
+    currentSegment=0
+    runSegment()
 }
 
 function runSegment(){
-let seg=segments[currentSegment]
-timeRemaining=seg.time
-const label=document.getElementById("segmentLabel")
-label.innerText=seg.name
-let name=seg.name.toLowerCase()
-label.style.fontWeight="bold"
-label.style.fontSize="39px"
-if(name.includes("run")) label.style.color="red"
-else if(name.includes("walk")) label.style.color="limegreen"
-else label.style.color="white"
-updateDisplay()
-timerInterval=setInterval(()=>{
-timeRemaining--
-updateDisplay()
-if(timeRemaining<=3 && timeRemaining>0){playBeep(1600)}
-if(timeRemaining===0){
-playTripleBeep()
-clearInterval(timerInterval)
-currentSegment++
-if(currentSegment<segments.length){setTimeout(runSegment,400)}
-else{label.innerText="Finished";label.style.color="white"}
-}
-},1000)
+    let seg=segments[currentSegment]
+    timeRemaining=seg.time
+    const label=document.getElementById("segmentLabel")
+    label.innerText=seg.name
+    let name=seg.name.toLowerCase()
+    label.style.fontWeight="bold"
+    label.style.fontSize="39px"
+    if(name.includes("run")) label.style.color="red"
+    else if(name.includes("walk")) label.style.color="limegreen"
+    else label.style.color="white"
+    updateDisplay()
+    timerInterval=setInterval(()=>{
+        timeRemaining--
+        updateDisplay()
+        if(timeRemaining===3) playBeep(1600)
+        if(timeRemaining===2) playBeep(1600)
+        if(timeRemaining===1) playBeep(1600)
+        if(timeRemaining===0){
+            playTripleBeep()
+            clearInterval(timerInterval)
+            currentSegment++
+            if(currentSegment<segments.length){setTimeout(runSegment,400)}
+            else{label.innerText="Finished"; label.style.color="white"}
+        }
+    },1000)
 }
 
 function stopTimer(){clearInterval(timerInterval)}
 
 function updateDisplay(){
-let m=Math.floor(timeRemaining/60)
-let s=timeRemaining%60
-document.getElementById("timer").innerText=
-String(m).padStart(2,"0")+":"+String(s).padStart(2,"0")
+    let m=Math.floor(timeRemaining/60)
+    let s=timeRemaining%60
+    document.getElementById("timer").innerText=
+        String(m).padStart(2,"0")+":"+String(s).padStart(2,"0")
 }
 
 function addSegment(){
-let name=prompt("Segment name")
-if(!name)return
-let seconds=parseInt(prompt("Seconds"))
-segments.push({name:name,time:seconds})
-renderSegments()
+    let name=prompt("Segment name")
+    if(!name)return
+    let seconds=parseInt(prompt("Seconds"))
+    segments.push({name:name,time:seconds})
+    renderSegments()
 }
 
 function editSegment(i){
-let newName=prompt("Segment name",segments[i].name)
-if(newName===null)return
-let newTime=parseInt(prompt("Seconds",segments[i].time))
-if(newTime===null)return
-segments[i]={name:newName,time:newTime}
-renderSegments()
+    let newName=prompt("Segment name",segments[i].name)
+    if(newName===null) return
+    let newTime=parseInt(prompt("Seconds",segments[i].time))
+    if(newTime===null) return
+    segments[i]={name:newName,time:newTime}
+    renderSegments()
 }
 
 function deleteSegment(i){
-if(!confirm("Delete segment?"))return
-segments.splice(i,1)
-renderSegments()
+    if(!confirm("Delete segment?")) return
+    segments.splice(i,1)
+    renderSegments()
 }
 
 function moveUp(i){
-if(i===0)return
-let temp=segments[i]
-segments[i]=segments[i-1]
-segments[i-1]=temp
-renderSegments()
+    if(i===0) return
+    let temp=segments[i]
+    segments[i]=segments[i-1]
+    segments[i-1]=temp
+    renderSegments()
 }
 
 function moveDown(i){
-if(i===segments.length-1)return
-let temp=segments[i]
-segments[i]=segments[i+1]
-segments[i+1]=temp
-renderSegments()
+    if(i===segments.length-1) return
+    let temp=segments[i]
+    segments[i]=segments[i+1]
+    segments[i+1]=temp
+    renderSegments()
 }
 
 function renderSegments(){
-let list=document.getElementById("segments")
-list.innerHTML=""
-segments.forEach((seg,i)=>{
-let div=document.createElement("div")
-div.className="segment"
-div.innerHTML=`
-<div class="segmentName" onclick="editSegment(${i})">
-<b>${seg.name}</b> - ${seg.time}s
-</div>
-<div class="controls">
-<button onclick="moveUp(${i})">⬆</button>
-<button onclick="moveDown(${i})">⬇</button>
-<button onclick="deleteSegment(${i})">Delete</button>
-</div>`
-list.appendChild(div)
-})
+    let list=document.getElementById("segments")
+    list.innerHTML=""
+    segments.forEach((seg,i)=>{
+        let div=document.createElement("div")
+        div.className="segment"
+        div.innerHTML=`
+        <div class="segmentName" onclick="editSegment(${i})">
+        <b>${seg.name}</b> - ${seg.time}s
+        </div>
+        <div class="controls">
+        <button onclick="moveUp(${i})">⬆</button>
+        <button onclick="moveDown(${i})">⬇</button>
+        <button onclick="deleteSegment(${i})">Delete</button>
+        </div>`
+        list.appendChild(div)
+    })
 }
 
-// New Program function
 function newProgram(){
-if(confirm("Start a new program? This will clear current segments.")){
-segments=[]
-renderSegments()
-document.getElementById("segmentLabel").innerText="Ready"
-document.getElementById("timer").innerText="00:00"
-}
+    if(confirm("Start a new program? This will clear current segments.")){
+        segments=[]
+        renderSegments()
+        document.getElementById("segmentLabel").innerText="Ready"
+        document.getElementById("timer").innerText="00:00"
+    }
 }
 
-// Save always prompts for program name
 function saveProgram(){
-let name=prompt("Enter a name for this program")
-if(!name)return
-let programs=JSON.parse(localStorage.getItem("hiitPrograms")||"{}")
-programs[name]=segments
-localStorage.setItem("hiitPrograms",JSON.stringify(programs))
-refreshProgramDropdown()
-alert("Program saved as \"" + name + "\"")
+    let name=prompt("Enter a name for this program")
+    if(!name) return
+    let programs=JSON.parse(localStorage.getItem("hiitPrograms")||"{}")
+    programs[name]=segments
+    localStorage.setItem("hiitPrograms",JSON.stringify(programs))
+    refreshProgramDropdown()
+    alert("Program saved as \"" + name + "\"")
 }
 
 function loadProgram(){
-let name=document.getElementById("programSelect").value
-if(!name)return
-let programs=JSON.parse(localStorage.getItem("hiitPrograms")||"{}")
-segments=programs[name]||[]
-renderSegments()
+    let name=document.getElementById("programSelect").value
+    if(!name) return
+    let programs=JSON.parse(localStorage.getItem("hiitPrograms")||"{}")
+    segments=programs[name]||[]
+    renderSegments()
 }
 
 refreshProgramDropdown()
