@@ -12,62 +12,59 @@ background:#111;
 color:white;
 text-align:center;
 margin:0;
+padding:20px;
 }
 
 h1{
-margin-top:10px;
-}
-
-#timer{
-font-size:90px;
-margin:20px;
-}
-
-#segmentLabel{
-font-size:39px;
-font-weight:bold;
 margin-bottom:10px;
 }
 
+#timer{
+font-size:72px;
+margin:20px 0;
+}
+
+#segmentLabel{
+font-size:37px;
+font-weight:bold;
+margin-bottom:20px;
+}
+
 button{
-font-size:16px;
-padding:8px 14px;
+font-size:18px;
+padding:10px 16px;
 margin:4px;
 border:none;
 border-radius:6px;
 }
 
-.start{background:#2ecc71;color:white}
-.stop{background:#e74c3c;color:white}
-.add{background:#3498db;color:white}
+input,select{
+font-size:16px;
+padding:6px;
+margin:4px;
+}
+
+#segments{
+margin-top:20px;
+}
 
 .segment{
 display:flex;
 justify-content:space-between;
 align-items:center;
 background:#222;
-margin:6px;
 padding:10px;
+margin:6px 0;
 border-radius:6px;
 }
 
-.segmentName{
+.segment span{
 cursor:pointer;
 }
 
-.controls button{
-font-size:14px;
-padding:6px 8px;
-}
-
-#volumeControl{
-margin-top:10px;
-}
-
-select{
-font-size:18px;
-padding:6px;
-margin-top:10px;
+.drag{
+cursor:grab;
+margin-right:8px;
 }
 
 </style>
@@ -78,306 +75,353 @@ margin-top:10px;
 <h1>HIIT Timer</h1>
 
 <div id="segmentLabel">Ready</div>
-<div id="timer">00:00</div>
 
-<button class="start" onclick="startTimer()">Start</button>
-<button class="stop" onclick="stopTimer()">Stop</button>
-<button class="add" onclick="addSegment()">Add Segment</button>
+<div id="timer">0</div>
 
-<br>
+<button onclick="startWorkout()">Start</button>
+<button onclick="stopWorkout()">Stop</button>
 
-<select id="programSelect"></select>
+<br><br>
 
-<br>
+<label>Beep Volume</label>
+<input type="range" id="volume" min="0" max="1" step="0.05" value="0.5">
 
-<button onclick="saveProgram()">Save Program</button>
-<button onclick="loadProgram()">Load Program</button>
+<hr>
 
-<div id="volumeControl">
-Beep Volume<br>
-<input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="0.5">
-</div>
+<h3>Add Segment</h3>
+
+<input id="segName" placeholder="Run / Walk">
+<input id="segTime" type="number" placeholder="Seconds">
+
+<button onclick="addSegment()">Add</button>
+
+<hr>
+
+<button onclick="newProgram()">New Program</button>
+
+<input id="programName" placeholder="Program name">
+
+<button onclick="saveProgram()">Save</button>
+
+<button onclick="loadProgram()">Load</button>
+
+<select id="programList"></select>
+
+<hr>
 
 <div id="segments"></div>
 
 <script>
 
 let segments=[]
-let currentSegment=0
-let timeRemaining=0
-let timerInterval=null
-
+let timer=null
+let currentSeg=0
+let remaining=0
 let audioCtx=null
-let beepVolume=0.5
 
-document.getElementById("volumeSlider").addEventListener("input",e=>{
-beepVolume=parseFloat(e.target.value)
-})
-
-function refreshProgramDropdown(){
-
-let programs=JSON.parse(localStorage.getItem("hiitPrograms")||"{}")
-let select=document.getElementById("programSelect")
-
-select.innerHTML=""
-
-Object.keys(programs).forEach(name=>{
-let option=document.createElement("option")
-option.value=name
-option.textContent=name
-select.appendChild(option)
-})
-
-}
-
-function initAudio(){
+function enableAudio(){
 
 if(!audioCtx){
-audioCtx=new(window.AudioContext||window.webkitAudioContext)()
-}
 
-if(audioCtx.state==="suspended"){
-audioCtx.resume()
-}
+audioCtx=new (window.AudioContext||window.webkitAudioContext)()
 
 }
 
-function playBeep(freq=1400,duration=120){
+}
+
+function beep(freq=900,duration=0.15){
 
 if(!audioCtx)return
 
-const osc=audioCtx.createOscillator()
-const gain=audioCtx.createGain()
+let vol=document.getElementById("volume").value
+
+let osc=audioCtx.createOscillator()
+let gain=audioCtx.createGain()
 
 osc.connect(gain)
 gain.connect(audioCtx.destination)
 
 osc.frequency.value=freq
-osc.type="square"
-
-gain.gain.setValueAtTime(beepVolume,audioCtx.currentTime)
+gain.gain.value=vol
 
 osc.start()
-osc.stop(audioCtx.currentTime+duration/1000)
+
+setTimeout(()=>{
+
+osc.stop()
+
+},duration*1000)
 
 }
 
-function playTripleBeep(){
+function tripleBeep(){
 
-playBeep(600)
-setTimeout(()=>playBeep(600),150)
-setTimeout(()=>playBeep(600),300)
+beep(1000,0.1)
 
-}
+setTimeout(()=>beep(1000,0.1),120)
 
-function startTimer(){
-
-initAudio()
-
-if(segments.length===0)return
-
-currentSegment=0
-runSegment()
+setTimeout(()=>beep(1000,0.1),240)
 
 }
 
-function runSegment(){
+function updateSegments(){
 
-let seg=segments[currentSegment]
+let container=document.getElementById("segments")
+container.innerHTML=""
 
-timeRemaining=seg.time
-
-const label=document.getElementById("segmentLabel")
-
-label.innerText=seg.name
-
-let name=seg.name.toLowerCase()
-
-label.style.fontWeight="bold"
-label.style.fontSize="39px"
-
-if(name.includes("run")){
-label.style.color="red"
-}
-else if(name.includes("walk")){
-label.style.color="limegreen"
-}
-else{
-label.style.color="white"
-}
-
-updateDisplay()
-
-timerInterval=setInterval(()=>{
-
-timeRemaining--
-
-updateDisplay()
-
-if(timeRemaining<=3 && timeRemaining>0){
-playBeep(1600)
-}
-
-if(timeRemaining===0){
-
-playTripleBeep()
-
-clearInterval(timerInterval)
-
-currentSegment++
-
-if(currentSegment<segments.length){
-setTimeout(runSegment,400)
-}
-else{
-label.innerText="Finished"
-label.style.color="white"
-}
-
-}
-
-},1000)
-
-}
-
-function stopTimer(){
-clearInterval(timerInterval)
-}
-
-function updateDisplay(){
-
-let m=Math.floor(timeRemaining/60)
-let s=timeRemaining%60
-
-document.getElementById("timer").innerText=
-String(m).padStart(2,"0")+":"+String(s).padStart(2,"0")
-
-}
-
-function addSegment(){
-
-let name=prompt("Segment name")
-if(!name)return
-
-let seconds=parseInt(prompt("Seconds"))
-
-segments.push({name:name,time:seconds})
-
-renderSegments()
-
-}
-
-function editSegment(i){
-
-let newName=prompt("Segment name",segments[i].name)
-if(!newName)return
-
-let newTime=parseInt(prompt("Seconds",segments[i].time))
-
-segments[i]={name:newName,time:newTime}
-
-renderSegments()
-
-}
-
-function deleteSegment(i){
-
-if(!confirm("Delete segment?"))return
-
-segments.splice(i,1)
-
-renderSegments()
-
-}
-
-function moveUp(i){
-
-if(i===0)return
-
-let temp=segments[i]
-segments[i]=segments[i-1]
-segments[i-1]=temp
-
-renderSegments()
-
-}
-
-function moveDown(i){
-
-if(i===segments.length-1)return
-
-let temp=segments[i]
-segments[i]=segments[i+1]
-segments[i+1]=temp
-
-renderSegments()
-
-}
-
-function renderSegments(){
-
-let list=document.getElementById("segments")
-list.innerHTML=""
-
-segments.forEach((seg,i)=>{
+segments.forEach((s,i)=>{
 
 let div=document.createElement("div")
 div.className="segment"
+div.draggable=true
 
-div.innerHTML=`
-<div class="segmentName" onclick="editSegment(${i})">
-<b>${seg.name}</b> - ${seg.time}s
-</div>
+div.ondragstart=(e)=>{
 
-<div class="controls">
-<button onclick="moveUp(${i})">⬆</button>
-<button onclick="moveDown(${i})">⬇</button>
-<button onclick="deleteSegment(${i})">Delete</button>
-</div>
-`
+e.dataTransfer.setData("index",i)
 
-list.appendChild(div)
+}
+
+div.ondragover=(e)=>{
+
+e.preventDefault()
+
+}
+
+div.ondrop=(e)=>{
+
+let from=e.dataTransfer.getData("index")
+
+let temp=segments[from]
+
+segments.splice(from,1)
+
+segments.splice(i,0,temp)
+
+updateSegments()
+
+}
+
+let drag=document.createElement("span")
+drag.className="drag"
+drag.innerText="☰"
+
+let label=document.createElement("span")
+
+label.innerText=s.name+" ("+s.time+"s)"
+
+let name=s.name.toLowerCase()
+
+label.style.fontWeight="bold"
+label.style.fontSize="20px"
+
+if(name.includes("run")) label.style.color="red"
+else if(name.includes("walk")) label.style.color="limegreen"
+else label.style.color="white"
+
+label.onclick=()=>editSegment(i)
+
+let del=document.createElement("button")
+del.innerText="Delete"
+
+del.onclick=()=>{
+
+if(confirm("Delete segment?")){
+
+segments.splice(i,1)
+
+updateSegments()
+
+}
+
+}
+
+div.appendChild(drag)
+div.appendChild(label)
+div.appendChild(del)
+
+container.appendChild(div)
 
 })
 
 }
 
-function saveProgram(){
+function addSegment(){
 
-let name=document.getElementById("programSelect").value
+let name=document.getElementById("segName").value
+let time=parseInt(document.getElementById("segTime").value)
 
-if(!name){
-name=prompt("Program name")
-if(!name)return
+if(!name||!time)return
+
+segments.push({name,time})
+
+document.getElementById("segName").value=""
+document.getElementById("segTime").value=""
+
+updateSegments()
+
 }
 
-let programs=JSON.parse(localStorage.getItem("hiitPrograms")||"{}")
+function editSegment(i){
 
-programs[name]=segments
+let s=segments[i]
 
-localStorage.setItem("hiitPrograms",JSON.stringify(programs))
+let newName=prompt("Segment name",s.name)
+if(newName===null)return
 
-refreshProgramDropdown()
+let newTime=prompt("Seconds",s.time)
+if(newTime===null)return
 
-alert("Program saved")
+segments[i].name=newName
+segments[i].time=parseInt(newTime)
+
+updateSegments()
+
+}
+
+function startWorkout(){
+
+enableAudio()
+
+if(segments.length===0)return
+
+currentSeg=0
+
+runSegment()
+
+}
+
+function stopWorkout(){
+
+clearInterval(timer)
+
+document.getElementById("timer").innerText="0"
+document.getElementById("segmentLabel").innerText="Stopped"
+
+}
+
+function runSegment(){
+
+if(currentSeg>=segments.length){
+
+document.getElementById("segmentLabel").innerText="Done"
+
+return
+
+}
+
+let seg=segments[currentSeg]
+
+remaining=seg.time
+
+let label=document.getElementById("segmentLabel")
+
+label.innerText=seg.name
+
+label.style.fontWeight="bold"
+label.style.fontSize="37px"
+
+let name=seg.name.toLowerCase()
+
+if(name.includes("run")) label.style.color="red"
+else if(name.includes("walk")) label.style.color="limegreen"
+else label.style.color="white"
+
+timer=setInterval(()=>{
+
+document.getElementById("timer").innerText=remaining
+
+if(remaining===3)beep(850)
+if(remaining===2)beep(850)
+if(remaining===1)beep(850)
+
+if(remaining===0){
+
+clearInterval(timer)
+
+tripleBeep()
+
+currentSeg++
+
+setTimeout(runSegment,400)
+
+}
+
+remaining--
+
+},1000)
+
+}
+
+function saveProgram(){
+
+let name=document.getElementById("programName").value
+
+if(!name)return
+
+localStorage.setItem("hiit_"+name,JSON.stringify(segments))
+
+updateProgramList()
 
 }
 
 function loadProgram(){
 
-let name=document.getElementById("programSelect").value
+let select=document.getElementById("programList")
+
+let name=select.value
 
 if(!name)return
 
-let programs=JSON.parse(localStorage.getItem("hiitPrograms")||"{}")
+let data=localStorage.getItem("hiit_"+name)
 
-segments=programs[name]||[]
+segments=JSON.parse(data)||[]
 
-renderSegments()
+updateSegments()
 
 }
 
-refreshProgramDropdown()
+function updateProgramList(){
+
+let select=document.getElementById("programList")
+
+select.innerHTML=""
+
+for(let key in localStorage){
+
+if(key.startsWith("hiit_")){
+
+let name=key.replace("hiit_","")
+
+let opt=document.createElement("option")
+
+opt.value=name
+opt.innerText=name
+
+select.appendChild(opt)
+
+}
+
+}
+
+}
+
+function newProgram(){
+
+if(confirm("Start a new program?")){
+
+segments=[]
+
+updateSegments()
+
+document.getElementById("segmentLabel").innerText="Ready"
+
+document.getElementById("timer").innerText="0"
+
+}
+
+}
+
+updateProgramList()
 
 </script>
 
