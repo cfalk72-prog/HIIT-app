@@ -5,6 +5,7 @@
 <title>HIIT Timer</title>
 
 <style>
+
 body{
 font-family:Arial;
 background:#111;
@@ -13,13 +14,27 @@ text-align:center;
 margin:0;
 }
 
-h1{margin-top:10px;}
+h1{
+margin-top:10px;
+}
 
-#timer{font-size:90px;margin:20px;}
-#segmentLabel{font-size:39px;font-weight:bold;margin-bottom:10px;}
+#timer{
+font-size:90px;
+margin:20px;
+}
+
+#segmentLabel{
+font-size:39px;
+font-weight:bold;
+margin-bottom:10px;
+}
 
 button{
-font-size:16px;padding:8px 14px;margin:4px;border:none;border-radius:6px;
+font-size:16px;
+padding:8px 14px;
+margin:4px;
+border:none;
+border-radius:6px;
 }
 
 .start{background:#2ecc71;color:white}
@@ -36,17 +51,32 @@ padding:10px;
 border-radius:6px;
 }
 
-.segmentName{cursor:pointer;}
+.segmentName{
+cursor:pointer;
+}
 
-.controls button{font-size:14px;padding:6px 8px;}
+.controls button{
+font-size:14px;
+padding:6px 8px;
+}
 
-#volumeControl{margin-top:10px;}
-select{font-size:18px;padding:6px;margin-top:10px;}
+#volumeControl{
+margin-top:10px;
+}
+
+select{
+font-size:18px;
+padding:6px;
+margin-top:10px;
+}
+
 </style>
 </head>
+
 <body>
 
 <h1>HIIT Timer</h1>
+
 <div id="segmentLabel">Ready</div>
 <div id="timer">00:00</div>
 
@@ -55,28 +85,28 @@ select{font-size:18px;padding:6px;margin-top:10px;}
 <button class="add" onclick="addSegment()">Add Segment</button>
 
 <br>
+
+<select id="programSelect"></select>
+
+<br>
+
+<button onclick="saveProgram()">Save Program</button>
+<button onclick="loadProgram()">Load Program</button>
+
 <div id="volumeControl">
 Beep Volume<br>
 <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="0.5">
 </div>
 
-<br>
-<!-- New Program button -->
-<button onclick="newProgram()">New Program</button>
-
-<br><br>
-<select id="programSelect"></select>
-<br>
-<button onclick="saveProgram()">Save Program</button>
-<button onclick="loadProgram()">Load Program</button>
-
 <div id="segments"></div>
 
 <script>
+
 let segments=[]
 let currentSegment=0
 let timeRemaining=0
 let timerInterval=null
+
 let audioCtx=null
 let beepVolume=0.5
 
@@ -85,170 +115,271 @@ beepVolume=parseFloat(e.target.value)
 })
 
 function refreshProgramDropdown(){
+
 let programs=JSON.parse(localStorage.getItem("hiitPrograms")||"{}")
 let select=document.getElementById("programSelect")
+
 select.innerHTML=""
+
 Object.keys(programs).forEach(name=>{
 let option=document.createElement("option")
 option.value=name
 option.textContent=name
 select.appendChild(option)
 })
+
 }
 
 function initAudio(){
-if(!audioCtx){audioCtx=new(window.AudioContext||window.webkitAudioContext)()}
-if(audioCtx.state==="suspended"){audioCtx.resume()}
+
+if(!audioCtx){
+audioCtx=new(window.AudioContext||window.webkitAudioContext)()
+}
+
+if(audioCtx.state==="suspended"){
+audioCtx.resume()
+}
+
 }
 
 function playBeep(freq=1400,duration=120){
+
 if(!audioCtx)return
+
 const osc=audioCtx.createOscillator()
 const gain=audioCtx.createGain()
+
 osc.connect(gain)
 gain.connect(audioCtx.destination)
+
 osc.frequency.value=freq
 osc.type="square"
+
 gain.gain.setValueAtTime(beepVolume,audioCtx.currentTime)
+
 osc.start()
 osc.stop(audioCtx.currentTime+duration/1000)
+
 }
 
 function playTripleBeep(){
+
 playBeep(600)
 setTimeout(()=>playBeep(600),150)
 setTimeout(()=>playBeep(600),300)
+
 }
 
 function startTimer(){
+
 initAudio()
+
 if(segments.length===0)return
+
 currentSegment=0
 runSegment()
+
 }
 
 function runSegment(){
+
 let seg=segments[currentSegment]
+
 timeRemaining=seg.time
+
 const label=document.getElementById("segmentLabel")
+
 label.innerText=seg.name
+
 let name=seg.name.toLowerCase()
+
 label.style.fontWeight="bold"
 label.style.fontSize="39px"
-if(name.includes("run")) label.style.color="red"
-else if(name.includes("walk")) label.style.color="limegreen"
-else label.style.color="white"
-updateDisplay()
-timerInterval=setInterval(()=>{
-timeRemaining--
-updateDisplay()
-if(timeRemaining<=3 && timeRemaining>0){playBeep(1600)}
-if(timeRemaining===0){
-playTripleBeep()
-clearInterval(timerInterval)
-currentSegment++
-if(currentSegment<segments.length){setTimeout(runSegment,400)}
-else{label.innerText="Finished";label.style.color="white"}
+
+if(name.includes("run")){
+label.style.color="red"
 }
-},1000)
+else if(name.includes("walk")){
+label.style.color="limegreen"
+}
+else{
+label.style.color="white"
 }
 
-function stopTimer(){clearInterval(timerInterval)}
+updateDisplay()
+
+timerInterval=setInterval(()=>{
+
+timeRemaining--
+
+updateDisplay()
+
+if(timeRemaining<=3 && timeRemaining>0){
+playBeep(1600)
+}
+
+if(timeRemaining===0){
+
+playTripleBeep()
+
+clearInterval(timerInterval)
+
+currentSegment++
+
+if(currentSegment<segments.length){
+setTimeout(runSegment,400)
+}
+else{
+label.innerText="Finished"
+label.style.color="white"
+}
+
+}
+
+},1000)
+
+}
+
+function stopTimer(){
+clearInterval(timerInterval)
+}
 
 function updateDisplay(){
+
 let m=Math.floor(timeRemaining/60)
 let s=timeRemaining%60
+
 document.getElementById("timer").innerText=
 String(m).padStart(2,"0")+":"+String(s).padStart(2,"0")
+
 }
 
 function addSegment(){
+
 let name=prompt("Segment name")
 if(!name)return
+
 let seconds=parseInt(prompt("Seconds"))
+
 segments.push({name:name,time:seconds})
+
 renderSegments()
+
 }
 
 function editSegment(i){
+
 let newName=prompt("Segment name",segments[i].name)
-if(newName===null)return
+if(!newName)return
+
 let newTime=parseInt(prompt("Seconds",segments[i].time))
-if(newTime===null)return
+
 segments[i]={name:newName,time:newTime}
+
 renderSegments()
+
 }
 
 function deleteSegment(i){
+
 if(!confirm("Delete segment?"))return
+
 segments.splice(i,1)
+
 renderSegments()
+
 }
 
 function moveUp(i){
+
 if(i===0)return
+
 let temp=segments[i]
 segments[i]=segments[i-1]
 segments[i-1]=temp
+
 renderSegments()
+
 }
 
 function moveDown(i){
+
 if(i===segments.length-1)return
+
 let temp=segments[i]
 segments[i]=segments[i+1]
 segments[i+1]=temp
+
 renderSegments()
+
 }
 
 function renderSegments(){
+
 let list=document.getElementById("segments")
 list.innerHTML=""
+
 segments.forEach((seg,i)=>{
+
 let div=document.createElement("div")
 div.className="segment"
+
 div.innerHTML=`
 <div class="segmentName" onclick="editSegment(${i})">
 <b>${seg.name}</b> - ${seg.time}s
 </div>
+
 <div class="controls">
 <button onclick="moveUp(${i})">⬆</button>
 <button onclick="moveDown(${i})">⬇</button>
 <button onclick="deleteSegment(${i})">Delete</button>
-</div>`
-list.appendChild(div)
-})
-}
+</div>
+`
 
-// NEW PROGRAM BUTTON FUNCTION
-function newProgram(){
-if(confirm("Start a new program? This will clear current segments.")){
-segments=[]
-renderSegments()
-document.getElementById("segmentLabel").innerText="Ready"
-document.getElementById("timer").innerText="00:00"
-}
+list.appendChild(div)
+
+})
+
 }
 
 function saveProgram(){
+
 let name=document.getElementById("programSelect").value
-if(!name){name=prompt("Program name");if(!name)return}
+
+if(!name){
+name=prompt("Program name")
+if(!name)return
+}
+
 let programs=JSON.parse(localStorage.getItem("hiitPrograms")||"{}")
+
 programs[name]=segments
+
 localStorage.setItem("hiitPrograms",JSON.stringify(programs))
+
 refreshProgramDropdown()
+
 alert("Program saved")
+
 }
 
 function loadProgram(){
+
 let name=document.getElementById("programSelect").value
+
 if(!name)return
+
 let programs=JSON.parse(localStorage.getItem("hiitPrograms")||"{}")
+
 segments=programs[name]||[]
+
 renderSegments()
+
 }
 
 refreshProgramDropdown()
+
 </script>
+
 </body>
 </html>
