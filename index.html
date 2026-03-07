@@ -54,7 +54,7 @@ document.getElementById("volumeSlider").addEventListener("input", e=>{
     beepVolume=parseFloat(e.target.value);
 });
 
-// Play beep using Oscillator so iPhone works
+// Play beep using Web Audio API
 function playBeep(freq=1400,duration=120){
     if(!audioCtx) return;
     const osc = audioCtx.createOscillator();
@@ -74,7 +74,7 @@ function playTripleBeep(){
     setTimeout(()=>playBeep(600),300);
 }
 
-// Unlock AudioContext on Start
+// Start timer, unlock audio on iPhone
 function startTimer(){
     if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if(audioCtx.state==="suspended") audioCtx.resume();
@@ -83,35 +83,40 @@ function startTimer(){
     runSegment();
 }
 
+// Accurate timer using system time
 function runSegment(){
-    let seg=segments[currentSegment];
-    timeRemaining=seg.time;
-    const label=document.getElementById("segmentLabel");
-    label.innerText=seg.name;
-    let name=seg.name.toLowerCase();
+    let seg = segments[currentSegment];
+    const startTime = Date.now();
+    const endTime = startTime + seg.time * 1000;
+    const label = document.getElementById("segmentLabel");
+    label.innerText = seg.name;
+    let name = seg.name.toLowerCase();
     label.style.fontWeight="bold";
     label.style.fontSize="44px";
-    if(name.includes("run")) label.style.color="red";
-    else if(name.includes("walk")) label.style.color="limegreen";
-    else label.style.color="white";
-    updateDisplay();
-    timerInterval=setInterval(()=>{
-        timeRemaining--;
+    label.style.color = name.includes("run") ? "red" : (name.includes("walk") ? "limegreen" : "white");
+
+    function tick(){
+        let now = Date.now();
+        timeRemaining = Math.max(0, Math.ceil((endTime - now)/1000));
         updateDisplay();
-        if(timeRemaining===3) playBeep();
-        if(timeRemaining===2) playBeep();
-        if(timeRemaining===1) playBeep();
-        if(timeRemaining===0){
+
+        if(timeRemaining===3 && !tick.count3){ playBeep(); tick.count3=true; }
+        if(timeRemaining===2 && !tick.count2){ playBeep(); tick.count2=true; }
+        if(timeRemaining===1 && !tick.count1){ playBeep(); tick.count1=true; }
+
+        if(timeRemaining<=0){
             playTripleBeep();
             clearInterval(timerInterval);
             currentSegment++;
-            if(currentSegment<segments.length){setTimeout(runSegment,400);}
-            else{label.innerText="Finished"; label.style.color="white";}
+            if(currentSegment < segments.length){ setTimeout(runSegment, 400); }
+            else { label.innerText="Finished"; label.style.color="white"; }
         }
-    },1000);
+    }
+    tick.count3 = tick.count2 = tick.count1 = false;
+    timerInterval = setInterval(tick, 100);
 }
 
-function stopTimer(){clearInterval(timerInterval);}
+function stopTimer(){ clearInterval(timerInterval); }
 
 function updateDisplay(){
     let m=Math.floor(timeRemaining/60);
