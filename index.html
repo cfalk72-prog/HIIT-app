@@ -15,7 +15,6 @@ button{font-size:16px;padding:8px 14px;margin:4px;border:none;border-radius:6px;
 .segment{display:flex;justify-content:space-between;align-items:center;background:#222;margin:6px;padding:10px;border-radius:6px;}
 .segmentName{cursor:pointer;}
 .controls button{font-size:14px;padding:6px 8px;}
-#volumeControl{margin-top:10px;}
 select{font-size:18px;padding:6px;margin-top:10px;}
 </style>
 </head>
@@ -30,12 +29,6 @@ select{font-size:18px;padding:6px;margin-top:10px;}
 <button class="add" onclick="addSegment()">Add Segment</button>
 
 <br>
-<div id="volumeControl">
-Beep Volume<br>
-<input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="0.5">
-</div>
-
-<br>
 <button onclick="newProgram()">New Program</button>
 
 <br><br>
@@ -47,51 +40,20 @@ Beep Volume<br>
 <div id="segments"></div>
 
 <script>
-let segments=[],currentSegment=0,timeRemaining=0,timerInterval=null,audioCtx=null,beepVolume=0.5;
+let segments=[],currentSegment=0,timeRemaining=0,timerInterval=null;
 
-document.getElementById("volumeSlider").addEventListener("input",e=>{
-    beepVolume=parseFloat(e.target.value)
-})
-
-function refreshProgramDropdown(){
-    let programs=JSON.parse(localStorage.getItem("hiitPrograms")||"{}");
-    let select=document.getElementById("programSelect");
-    select.innerHTML="";
-    Object.keys(programs).forEach(name=>{
-        let option=document.createElement("option");
-        option.value=name;
-        option.textContent=name;
-        select.appendChild(option);
-    });
-}
-
-function initAudio(){
-    if(!audioCtx){ audioCtx = new (window.AudioContext||window.webkitAudioContext)() }
-    if(audioCtx.state==="suspended"){ audioCtx.resume() }
-}
-
-function playBeep(freq=1400,duration=120){
-    if(!audioCtx)return;
-    const osc=audioCtx.createOscillator();
-    const gain=audioCtx.createGain();
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.frequency.value=freq;
-    osc.type="square";
-    gain.gain.setValueAtTime(beepVolume,audioCtx.currentTime);
-    osc.start();
-    osc.stop(audioCtx.currentTime+duration/1000);
+function playBeep(){
+    var audio = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=');
+    audio.play();
 }
 
 function playTripleBeep(){
-    playBeep(600);
-    setTimeout(()=>playBeep(600),150);
-    setTimeout(()=>playBeep(600),300);
+    playBeep();
+    setTimeout(playBeep,150);
+    setTimeout(playBeep,300);
 }
 
 function startTimer(){
-    // Direct user gesture unlock for iPhone
-    initAudio();
     if(segments.length===0) return;
     currentSegment=0;
     runSegment();
@@ -104,7 +66,7 @@ function runSegment(){
     label.innerText=seg.name;
     let name=seg.name.toLowerCase();
     label.style.fontWeight="bold";
-    label.style.fontSize="39px";
+    label.style.fontSize="44px"; // slightly larger
     if(name.includes("run")) label.style.color="red";
     else if(name.includes("walk")) label.style.color="limegreen";
     else label.style.color="white";
@@ -112,9 +74,9 @@ function runSegment(){
     timerInterval=setInterval(()=>{
         timeRemaining--;
         updateDisplay();
-        if(timeRemaining===3) playBeep(1600);
-        if(timeRemaining===2) playBeep(1600);
-        if(timeRemaining===1) playBeep(1600);
+        if(timeRemaining===3) playBeep();
+        if(timeRemaining===2) playBeep();
+        if(timeRemaining===1) playBeep();
         if(timeRemaining===0){
             playTripleBeep();
             clearInterval(timerInterval);
@@ -122,10 +84,10 @@ function runSegment(){
             if(currentSegment<segments.length){setTimeout(runSegment,400);}
             else{label.innerText="Finished"; label.style.color="white";}
         }
-    },1000)
+    },1000);
 }
 
-function stopTimer(){clearInterval(timerInterval)}
+function stopTimer(){clearInterval(timerInterval);}
 
 function updateDisplay(){
     let m=Math.floor(timeRemaining/60);
@@ -136,7 +98,7 @@ function updateDisplay(){
 
 function addSegment(){
     let name=prompt("Segment name");
-    if(!name)return;
+    if(!name) return;
     let seconds=parseInt(prompt("Seconds"));
     segments.push({name:name,time:seconds});
     renderSegments();
@@ -144,21 +106,21 @@ function addSegment(){
 
 function editSegment(i){
     let newName=prompt("Segment name",segments[i].name);
-    if(newName===null)return;
+    if(newName===null) return;
     let newTime=parseInt(prompt("Seconds",segments[i].time));
-    if(newTime===null)return;
+    if(newTime===null) return;
     segments[i]={name:newName,time:newTime};
     renderSegments();
 }
 
 function deleteSegment(i){
-    if(!confirm("Delete segment?"))return;
+    if(!confirm("Delete segment?")) return;
     segments.splice(i,1);
     renderSegments();
 }
 
 function moveUp(i){
-    if(i===0)return;
+    if(i===0) return;
     let temp=segments[i];
     segments[i]=segments[i-1];
     segments[i-1]=temp;
@@ -166,7 +128,7 @@ function moveUp(i){
 }
 
 function moveDown(i){
-    if(i===segments.length-1)return;
+    if(i===segments.length-1) return;
     let temp=segments[i];
     segments[i]=segments[i+1];
     segments[i+1]=temp;
@@ -203,7 +165,7 @@ function newProgram(){
 
 function saveProgram(){
     let name=prompt("Enter a name for this program");
-    if(!name)return;
+    if(!name) return;
     let programs=JSON.parse(localStorage.getItem("hiitPrograms")||"{}");
     programs[name]=segments;
     localStorage.setItem("hiitPrograms",JSON.stringify(programs));
@@ -213,10 +175,22 @@ function saveProgram(){
 
 function loadProgram(){
     let name=document.getElementById("programSelect").value;
-    if(!name)return;
+    if(!name) return;
     let programs=JSON.parse(localStorage.getItem("hiitPrograms")||"{}");
     segments=programs[name]||[];
     renderSegments();
+}
+
+function refreshProgramDropdown(){
+    let programs=JSON.parse(localStorage.getItem("hiitPrograms")||"{}");
+    let select=document.getElementById("programSelect");
+    select.innerHTML="";
+    Object.keys(programs).forEach(name=>{
+        let option=document.createElement("option");
+        option.value=name;
+        option.textContent=name;
+        select.appendChild(option);
+    });
 }
 
 refreshProgramDropdown();
