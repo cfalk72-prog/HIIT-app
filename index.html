@@ -14,23 +14,21 @@ text-align:center;
 margin:0;
 }
 
-h1{
-margin-top:10px;
-}
+h1{margin-top:10px;}
 
 #timer{
-font-size:80px;
+font-size:90px;
 margin:20px;
 }
 
 #segmentLabel{
-font-size:24px;
+font-size:26px;
 margin-bottom:10px;
 }
 
 button{
 font-size:18px;
-padding:10px 20px;
+padding:10px 18px;
 margin:5px;
 border:none;
 border-radius:6px;
@@ -45,14 +43,14 @@ display:flex;
 justify-content:space-between;
 align-items:center;
 background:#222;
-margin:5px;
+margin:6px;
 padding:10px;
 border-radius:6px;
 }
 
 .drag{
 cursor:grab;
-margin-right:10px;
+margin-right:8px;
 }
 
 </style>
@@ -68,8 +66,8 @@ margin-right:10px;
 <button class="start" onclick="startTimer()">Start</button>
 <button class="stop" onclick="stopTimer()">Stop</button>
 <button class="add" onclick="addSegment()">Add Segment</button>
-<button onclick="saveProgram()">Save</button>
-<button onclick="loadProgram()">Load</button>
+<button onclick="saveProgram()">Save Program</button>
+<button onclick="loadProgram()">Load Program</button>
 
 <div id="segments"></div>
 
@@ -82,7 +80,7 @@ let timerInterval=null
 
 let audioCtx=null
 
-function unlockAudio(){
+function initAudio(){
 
 if(!audioCtx){
 audioCtx=new(window.AudioContext||window.webkitAudioContext)()
@@ -94,16 +92,9 @@ audioCtx.resume()
 
 }
 
-document.body.addEventListener("touchstart",unlockAudio)
-document.body.addEventListener("click",unlockAudio)
-
-function playBeep(freq=1200,duration=120){
+function playBeep(freq=1400,duration=120){
 
 if(!audioCtx)return
-
-if(audioCtx.state==="suspended"){
-audioCtx.resume()
-}
 
 const osc=audioCtx.createOscillator()
 const gain=audioCtx.createGain()
@@ -114,9 +105,9 @@ gain.connect(audioCtx.destination)
 osc.frequency.value=freq
 osc.type="square"
 
-gain.gain.setValueAtTime(.4,audioCtx.currentTime)
+gain.gain.setValueAtTime(.5,audioCtx.currentTime)
 
-osc.start(audioCtx.currentTime)
+osc.start()
 osc.stop(audioCtx.currentTime+duration/1000)
 
 }
@@ -131,7 +122,7 @@ setTimeout(()=>playBeep(600),300)
 
 function startTimer(){
 
-unlockAudio()
+initAudio()
 
 if(segments.length===0)return
 
@@ -146,9 +137,9 @@ let seg=segments[currentSegment]
 
 timeRemaining=seg.time
 
-updateDisplay()
-
 document.getElementById("segmentLabel").innerText=seg.name
+
+updateDisplay()
 
 timerInterval=setInterval(()=>{
 
@@ -157,7 +148,7 @@ timeRemaining--
 updateDisplay()
 
 if(timeRemaining<=3 && timeRemaining>0){
-playBeep(1500)
+playBeep(1600)
 }
 
 if(timeRemaining===0){
@@ -169,7 +160,7 @@ clearInterval(timerInterval)
 currentSegment++
 
 if(currentSegment<segments.length){
-setTimeout(runSegment,500)
+setTimeout(runSegment,400)
 }else{
 document.getElementById("segmentLabel").innerText="Finished"
 }
@@ -265,19 +256,38 @@ list.appendChild(div)
 
 function saveProgram(){
 
-localStorage.setItem("hiitSegments",JSON.stringify(segments))
-alert("Saved")
+let name=prompt("Program name")
+
+if(!name)return
+
+let programs=JSON.parse(localStorage.getItem("hiitPrograms")||"{}")
+
+programs[name]=segments
+
+localStorage.setItem("hiitPrograms",JSON.stringify(programs))
+
+alert("Program saved")
 
 }
 
 function loadProgram(){
 
-let data=localStorage.getItem("hiitSegments")
+let programs=JSON.parse(localStorage.getItem("hiitPrograms")||"{}")
 
-if(data){
-segments=JSON.parse(data)
-renderSegments()
+let names=Object.keys(programs)
+
+if(names.length===0){
+alert("No saved programs")
+return
 }
+
+let name=prompt("Available:\n"+names.join("\n")+"\n\nType program name")
+
+if(!programs[name])return
+
+segments=programs[name]
+
+renderSegments()
 
 }
 
