@@ -22,8 +22,9 @@ margin:20px;
 }
 
 #segmentLabel{
-font-size:26px;
+font-size:50px;
 margin-bottom:10px;
+font-weight:bold;
 }
 
 button{
@@ -185,7 +186,19 @@ let seg=segments[currentSegment]
 
 timeRemaining=seg.time
 
-document.getElementById("segmentLabel").innerText=seg.name
+let label=document.getElementById("segmentLabel")
+
+label.innerText=seg.name
+
+let name=seg.name.toLowerCase()
+
+if(name.includes("run")){
+label.style.color="red"
+}else if(name.includes("walk")){
+label.style.color="limegreen"
+}else{
+label.style.color="white"
+}
 
 updateDisplay()
 
@@ -210,7 +223,8 @@ currentSegment++
 if(currentSegment<segments.length){
 setTimeout(runSegment,400)
 }else{
-document.getElementById("segmentLabel").innerText="Finished"
+label.innerText="Finished"
+label.style.color="white"
 }
 
 }
