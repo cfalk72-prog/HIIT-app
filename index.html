@@ -258,6 +258,30 @@ renderSegments()
 
 }
 
+function moveUp(i){
+
+if(i===0)return
+
+let temp=segments[i]
+segments[i]=segments[i-1]
+segments[i-1]=temp
+
+renderSegments()
+
+}
+
+function moveDown(i){
+
+if(i===segments.length-1)return
+
+let temp=segments[i]
+segments[i]=segments[i+1]
+segments[i+1]=temp
+
+renderSegments()
+
+}
+
 function renderSegments(){
 
 let list=document.getElementById("segments")
@@ -267,34 +291,15 @@ segments.forEach((seg,i)=>{
 
 let div=document.createElement("div")
 div.className="segment"
-div.draggable=true
 
 div.innerHTML=`
-<span class="drag">☰</span>
 ${seg.name} - ${seg.time}s
+<div>
+<button onclick="moveUp(${i})">⬆</button>
+<button onclick="moveDown(${i})">⬇</button>
 <button onclick="deleteSegment(${i})">Delete</button>
+</div>
 `
-
-div.addEventListener("dragstart",e=>{
-e.dataTransfer.setData("index",i)
-})
-
-div.addEventListener("dragover",e=>{
-e.preventDefault()
-})
-
-div.addEventListener("drop",e=>{
-
-let from=e.dataTransfer.getData("index")
-
-let temp=segments[from]
-
-segments.splice(from,1)
-segments.splice(i,0,temp)
-
-renderSegments()
-
-})
 
 list.appendChild(div)
 
