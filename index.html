@@ -339,9 +339,22 @@ renderSegments()
 
 function newProgram(){
 
-if(!confirm("Start a new program? This will clear current segments."))return
+let name=prompt("Name of the new program")
+
+if(!name)return
+
+let programs=JSON.parse(localStorage.getItem("hiitPrograms")||"{}")
+
+programs[name]=[]
+
+localStorage.setItem("hiitPrograms",JSON.stringify(programs))
+
+refreshProgramDropdown()
+
+document.getElementById("programSelect").value=name
 
 segments=[]
+
 renderSegments()
 
 document.getElementById("segmentLabel").innerText="Ready"
