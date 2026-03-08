@@ -85,6 +85,7 @@ margin-top:10px;
 
 <button onclick="saveProgram()">Save Program</button>
 <button onclick="loadProgram()">Load Program</button>
+<button onclick="newProgram()">New Program</button>
 
 <div id="volumeControl">
 Beep Volume<br>
@@ -333,6 +334,18 @@ let programs=JSON.parse(localStorage.getItem("hiitPrograms")||"{}")
 segments=programs[name]||[]
 
 renderSegments()
+
+}
+
+function newProgram(){
+
+if(!confirm("Start a new program? This will clear current segments."))return
+
+segments=[]
+renderSegments()
+
+document.getElementById("segmentLabel").innerText="Ready"
+document.getElementById("timer").innerText="00:00"
 
 }
 
