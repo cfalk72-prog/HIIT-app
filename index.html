@@ -87,6 +87,7 @@ margin-top:10px;
 <button onclick="saveProgram()">Save Program</button>
 <button onclick="loadProgram()">Load Program</button>
 <button onclick="newProgram()">New Program</button>
+<button onclick="deleteProgram()">Delete Program</button>
 
 <div id="volumeControl">
 Beep Volume<br>
@@ -374,6 +375,30 @@ document.getElementById("programSelect").value=name
 
 segments=[]
 
+renderSegments()
+
+document.getElementById("segmentLabel").innerText="Ready"
+document.getElementById("timer").innerText="00:00"
+
+}
+
+function deleteProgram(){
+
+let name=document.getElementById("programSelect").value
+
+if(!name)return
+
+if(!confirm("Delete program '"+name+"'?"))return
+
+let programs=JSON.parse(localStorage.getItem("hiitPrograms")||"{}")
+
+delete programs[name]
+
+localStorage.setItem("hiitPrograms",JSON.stringify(programs))
+
+refreshProgramDropdown()
+
+segments=[]
 renderSegments()
 
 document.getElementById("segmentLabel").innerText="Ready"
