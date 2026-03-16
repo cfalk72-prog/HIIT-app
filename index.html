@@ -82,7 +82,7 @@ margin-top:10px;
 <div id="timer">00:00</div>
 
 <button class="start" onclick="startTimer()">Start</button>
-<button class="stop" onclick="stopTimer()">Stop</button>
+<button class="stop" onclick="pauseTimer()">Pause</button>
 <button class="add" onclick="addSegment()">Add Segment</button>
 
 <br>
@@ -108,6 +108,7 @@ let segments=[]
 let currentSegment=0
 let timeRemaining=0
 let timerInterval=null
+let paused=false
 
 let audioCtx=null
 let beepVolume=0.5
@@ -182,8 +183,45 @@ initAudio()
 
 if(segments.length===0)return
 
+if(paused){
+paused=false
+timerInterval=setInterval(timerTick,1000)
+return
+}
+
 currentSegment=0
 runSegment()
+
+}
+
+function timerTick(){
+
+timeRemaining--
+
+updateDisplay()
+
+if(timeRemaining<=3 && timeRemaining>0){
+playBeep(1600)
+}
+
+if(timeRemaining===0){
+
+playTripleBeep()
+
+clearInterval(timerInterval)
+
+currentSegment++
+
+if(currentSegment<segments.length){
+setTimeout(runSegment,400)
+}else{
+let label=document.getElementById("segmentLabel")
+label.innerText="Finished"
+label.style.color="white"
+document.getElementById("nextSegment").innerText=""
+}
+
+}
 
 }
 
@@ -217,41 +255,14 @@ document.getElementById("nextSegment").innerText=""
 
 updateDisplay()
 
-timerInterval=setInterval(()=>{
+timerInterval=setInterval(timerTick,1000)
 
-timeRemaining--
-
-updateDisplay()
-
-if(timeRemaining<=3 && timeRemaining>0){
-playBeep(1600)
 }
 
-if(timeRemaining===0){
-
-playTripleBeep()
+function pauseTimer(){
 
 clearInterval(timerInterval)
-
-currentSegment++
-
-if(currentSegment<segments.length){
-setTimeout(runSegment,400)
-}else{
-label.innerText="Finished"
-label.style.color="white"
-document.getElementById("nextSegment").innerText=""
-}
-
-}
-
-},1000)
-
-}
-
-function stopTimer(){
-
-clearInterval(timerInterval)
+paused=true
 
 }
 
