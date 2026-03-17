@@ -83,6 +83,7 @@ margin-top:10px;
 
 <button class="start" onclick="startTimer()">Start</button>
 <button class="stop" onclick="pauseTimer()">Pause</button>
+<button onclick="nextSegment()">Next Segment</button>
 <button class="add" onclick="addSegment()">Add Segment</button>
 
 <br>
@@ -263,6 +264,29 @@ function pauseTimer(){
 
 clearInterval(timerInterval)
 paused=true
+
+}
+
+function nextSegment(){
+
+clearInterval(timerInterval)
+
+currentSegment++
+
+if(currentSegment < segments.length){
+
+runSegment()
+
+}else{
+
+let label=document.getElementById("segmentLabel")
+label.innerText="Finished"
+label.style.color="white"
+
+document.getElementById("timer").innerText="00:00"
+document.getElementById("nextSegment").innerText=""
+
+}
 
 }
 
