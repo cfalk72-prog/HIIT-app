@@ -323,6 +323,22 @@ renderSegments()
 
 }
 
+function editSegment(i){
+
+let seg = segments[i]
+
+let newName = prompt("Edit segment name", seg.name)
+if(!newName) return
+
+let newTime = parseInt(prompt("Edit seconds", seg.time))
+if(isNaN(newTime)) return
+
+segments[i] = {name:newName, time:newTime}
+
+renderSegments()
+
+}
+
 function moveUp(i){
 
 if(i===0)return
@@ -362,7 +378,8 @@ ${seg.name} - ${seg.time}s
 <div>
 <button onclick="moveUp(${i})">⬆</button>
 <button onclick="moveDown(${i})">⬇</button>
-<button onclick="deleteSegment(${i})">Delete</button>
+<button onclick="editSegment(${i})">✏️</button>
+<button onclick="deleteSegment(${i})">🗑️</button>
 </div>
 `
 
