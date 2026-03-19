@@ -126,6 +126,15 @@ let select=document.getElementById("programSelect")
 
 select.innerHTML=""
 
+// Placeholder option
+let placeholder=document.createElement("option")
+placeholder.value=""
+placeholder.textContent="Select a program"
+placeholder.disabled=true
+placeholder.selected=true
+select.appendChild(placeholder)
+
+// Programs
 Object.keys(programs).forEach(name=>{
 
 let option=document.createElement("option")
@@ -179,6 +188,12 @@ setTimeout(()=>playBeep(600),300)
 }
 
 function startTimer(){
+
+let selected=document.getElementById("programSelect").value
+if(!selected){
+alert("Please select a program first")
+return
+}
 
 initAudio()
 
